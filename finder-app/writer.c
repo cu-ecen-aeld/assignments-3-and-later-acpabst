@@ -5,22 +5,37 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <syslog.h>
+#include <fcntl.h>
 
 int main (int argc, char*argv[]) {
+    
+    openlog(NULL, 0, LOG_USER);
+
+    // Check the number of arguments
     if (argc != 2) {
-        // TODO syslog error message
+	syslog(LOG_ERR, "Invalid Number of arguments. Expected 2, recieved %d.", argc);
 	return 1;
     }
 
-    // TODO does this work with the full pathname?
-    DIR* dir = opendir("mydir");
-    if (dir) {
-        /* Directory exists. */
-        closedir(dir);
-    } else if (ENOENT == errno) {
-        /* Directory does not exist. */
+    // Create the specified file
+    int fd = open(argv[0], O_CREAT | O_WRONLY | O_EXCL, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        if (errno == EEXIST) {
+            // The file already existed
+	    syslog(LOG_DEBUG, "File already existed. Writing over contents.");
+        } else {
+	    syslog(LOG_ERR, "An error occured. %d: %s", errno, strerror(errno));
     } else {
-        /* opendir() failed for some other reason. */
-    }    
-
+        // File created
+	syslog(LOG_DEBUG, "File created.");
+    }
+    
+    // Write to file
+    ssize_t nr = write(fd, argv[1], strlen(argv[1]));
+    if (nr < 0) {
+        syslog(LOG_ERR, "An error occured. %d: %s", errnom strerror(errno));
+    }
+    syslog(LOG_DEBUG, "Writing %s to %s.", argv[1], argv[0]);
+    
 }
