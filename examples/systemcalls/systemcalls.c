@@ -47,9 +47,9 @@ bool do_exec(int count, ...)
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
-	printf("%s ", command[i]);
+	//printf("%s ", command[i]);
     }
-    printf("\n");
+    //printf("\n");
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
@@ -69,15 +69,15 @@ bool do_exec(int count, ...)
     if (pid == -1) {
         return false;
     } else if (pid == 0) {
-        execv(command[0], command+1);
+        execv(command[0], command);
         exit(-1);
-	printf("We're fucked bois\n");
+	//printf("We're forked bois\n");
     }	
 
     if (waitpid(pid, &status, 0) == -1) {
         return false;
     } else if (WIFEXITED(status)) {
-	printf("exited, status=%d\n", WEXITSTATUS(status));
+	//printf("exited, status=%d\n", WEXITSTATUS(status));
         if (WEXITSTATUS(status) == 0) {return true;}
 	else {return false;}
     } else { return false;}
@@ -104,7 +104,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 
 /*
@@ -122,17 +122,18 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     int status;
     pid_t pid = fork();
     if (pid == -1) {
-        return -1;
+        return false;
     } else if (pid == 0) {
-        execv(command[0], command+1);
-        return -1;
+        execv(command[0], command);
+        exit(-1);
     }
 
     if (waitpid(pid, &status, 0) == 1) {
-        return -1;
+        return false;
     } else if (WIFEXITED(status)) {
-        return WEXITSTATUS(status);
-    }
+        if (WEXITSTATUS(status) == 0) {return true;}
+	else {return false;}
+    } else {return false;}
 
     va_end(args);
 
