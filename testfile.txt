@@ -1,7 +1,9 @@
-Could not read from conf/username.txt
-execv /bin/sh -c echo home is $HOME returned 
-/home/ubuntu/PA3/assignments-3-and-later-acpabst/assignment-autotest/test/assignment3/Test_systemcalls.c:82:test_exec_redirect_calls:FAIL: Expected -104 Was 0. The first 9 chars echoed should be "home is /".  The last chars will include the content of the $HOME variable
+home is $HOME
+Remove trailing newline
+Read home is $HOME from testfile.txt
+execv /bin/echo home is $HOME returned home is $HOME
+/home/ubuntu/PA3/assignments-3-and-later-acpabst/assignment-autotest/test/assignment3/Test_systemcalls.c:72:test_exec_redirect_calls:PASS
 
 -----------------------
-3 Tests 2 Failures 0 Ignored 
-FAIL
+3 Tests 0 Failures 0 Ignored 
+OK
