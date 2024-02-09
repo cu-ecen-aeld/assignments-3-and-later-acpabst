@@ -47,11 +47,13 @@ bool do_exec(int count, ...)
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
+	printf("%s ", command[i]);
     }
+    printf("\n");
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 /*
  * TODO:
@@ -62,28 +64,26 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-    int status;
+    int status = -1;
     pid_t pid = fork();
     if (pid == -1) {
         return false;
     } else if (pid == 0) {
         execv(command[0], command+1);
-        return false;
+        exit(-1);
+	printf("We're fucked bois\n");
     }	
 
-    if (waitpid(pid, &status, 0) == 1) {
+    if (waitpid(pid, &status, 0) == -1) {
         return false;
-    } else if (status == 0) {
-        return true;
-    } else if (status == 1) {
-	return false;
-    } else {
-	return false;
-    }
+    } else if (WIFEXITED(status)) {
+	printf("exited, status=%d\n", WEXITSTATUS(status));
+        if (WEXITSTATUS(status) == 0) {return true;}
+	else {return false;}
+    } else { return false;}
 
     va_end(args);
-
-    return true;
+    return false;
 }
 
 /**
