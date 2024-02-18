@@ -35,6 +35,11 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     git checkout ${KERNEL_VERSION}
 
     # TODO: Add your kernel build steps here
+
+    sudo apt-get install -y --no-install-recommends bc u-boot-tools kmod cpio flex bison libssl-dev psmisc libncurses-dev
+    sudo apt-get install -y qemu-system-arm
+    make mrproper
+    make defconfig
 fi
 
 echo "Adding the Image in outdir"
