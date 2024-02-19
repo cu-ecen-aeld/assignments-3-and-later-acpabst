@@ -12,6 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
+CROSS_COMPILE_PATH=/home/ubuntu/PA2/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu
 
 if [ $# -lt 1 ]
 then
@@ -73,12 +74,24 @@ else
 fi
 
 # TODO: Make and install busybox
+make distclean
+make defconfig
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} 
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} CONFIG_PREFIX=/tmp/aeld/rootfs install
+cd ../rootfs
+pwd
 
 echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
+cp ${CROSS_COMPILE_PATH}/libc/lib/ld-linux-aarch64.so.1
+
+cp ${CROSS_COMPILE_PATH}/libc/lib64/libm.so.6 /lib64/libm.so.6
+cp ${CROSS_COMPILE_PATH}/libc/lib64/libresolv.so.2 /lib64/libresolv.so.2
+cp ${CROSS_COMPILE_PATH}/libc/lib64/libc.so.6 lib64/libc.so.6
+
 
 # TODO: Make device nodes
 
