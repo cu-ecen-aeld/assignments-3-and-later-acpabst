@@ -78,7 +78,7 @@ fi
 # TODO: Make and install busybox
 make distclean
 make defconfig
-make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all 
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} 
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} CONFIG_PREFIX=${OUTDIR}/rootfs install
 cd ../rootfs
 pwd
@@ -114,9 +114,9 @@ cp conf/username.txt ${OUTDIR}/rootfs/home/conf/username.txt
 cp conf/assignment.txt ${OUTDIR}/rootfs/home/conf/assignment.txt
 cp finder-test.sh ${OUTDIR}/rootfs/home/finder-test.sh
 
-sed 's+../conf/assignment.txt+/conf/assignment.txt+g' ${OUTDIR}/rootfs/home/finder-test.sh
+sed -n 's+../conf/assignment.txt+/conf/assignment.txt+g' ${OUTDIR}/rootfs/home/finder-test.sh
 
-cp autorun-qemu.sh ${OUTDIR}/rootfs/home
+cp autorun-qemu.sh ${OUTDIR}/rootfs/home/autorun-qemu.sh
 
 # TODO: Chown the root directory
 sudo chown root:root ${OUTDIR}/rootfs/root
@@ -126,3 +126,4 @@ cd ${OUTDIR}/rootfs
 find . | cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
 cd ..
 gzip -f initramfs.cpio
+sudo chown root:root initramfs.cpio.gz
