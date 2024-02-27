@@ -104,6 +104,7 @@ cd ${FINDER_APP_DIR}
 
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
+make writer CROSS_COMPILE=gcc
 cp writer ${OUTDIR}/rootfs/home/writer
 
 cp finder.sh ${OUTDIR}/rootfs/home/finder.sh
