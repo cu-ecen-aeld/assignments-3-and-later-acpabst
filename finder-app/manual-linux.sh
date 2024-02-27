@@ -12,7 +12,6 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
-CROSS_COMPILE_PATH="${HOME}/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu"
 
 if [ $# -lt 1 ]
 then
@@ -88,6 +87,7 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
+CROSS_COMILE_PATH=$(${CROSS_COMPILE}gcc -print-sysroot)
 sudo cp ${CROSS_COMPILE_PATH}/lib/ld-linux-aarch64.so.1 lib/ld-linux-aarch64.so.1
 
 sudo cp ${CROSS_COMPILE_PATH}/lib64/libm.so.6 lib64/libm.so.6
