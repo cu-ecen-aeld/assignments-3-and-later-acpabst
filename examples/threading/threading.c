@@ -15,15 +15,20 @@ void* threadfunc(void* thread_param)
     // TODO: wait, obtain mutex, wait, release mutex as described by thread_data structure
     // hint: use a cast like the one below to obtain thread arguments from your parameter
     struct thread_data* data = (struct thread_data *) thread_param;
-    sleep(data->obtain_wait/1000);
+    DEBUG_LOG("intermediate step. going to wait %d ms", data->obtain_wait);
+    
+    usleep(data->obtain_wait*1000);
     DEBUG_LOG("Well, I think I waited");
-    int rc = pthread_mutex_lock(&data->mutex);
+    
+    int rc = pthread_mutex_lock(data->mutex);
     if (rc != 0) {
         ERROR_LOG("pthread mutex lock failed. Code: %d", rc);
 	data->thread_complete_success = false;
     }
-    sleep(data->release_wait/1000);
-    rc = pthread_mutex_lock(&data->mutex);
+
+    usleep(data->release_wait*1000);
+    
+    rc = pthread_mutex_unlock(data->mutex);
     if (rc != 0) {
         ERROR_LOG("pthread mutex unlock failed. Code: %d", rc);
 	data->thread_complete_success = false;
@@ -52,11 +57,11 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
     data->obtain_wait = wait_to_obtain_ms;
     data->release_wait = wait_to_release_ms;
 
-    //int rc = 0;
+    int rc = 0;
     data->thread_complete_success = false;
-    
+    data->mutex = mutex;
     // Set up Mutex
-    int rc = pthread_mutex_init(&data->mutex,NULL);
+    // int rc = pthread_mutex_init(&data->mutex,NULL);
     if (rc != 0) {
         ERROR_LOG("pthread mutex init failed. Code: %d", rc);
 	return false;
@@ -67,13 +72,12 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
         return false;
     }
     // create thread
-    rc = pthread_create(thread, NULL, threadfunc, &data);
+    rc = pthread_create(thread, NULL, threadfunc, data);
     if (rc != 0) {
 	ERROR_LOG("thread could not be created. Code: %d", rc);
     }
     
-    DEBUG_LOG("Thread complete status: %d", data->thread_complete_success);
-    free(data);
+    DEBUG_LOG("Thread started");
     return true;
 }
 

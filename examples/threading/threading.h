@@ -18,7 +18,7 @@ typedef struct thread_data {
     /**
      * The mutex used to lock this data when manipulating values, for thread safety
      */
-    pthread_mutex_t mutex;
+    pthread_mutex_t *mutex;
 
     int obtain_wait;
     int release_wait;
