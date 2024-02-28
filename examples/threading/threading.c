@@ -29,7 +29,7 @@ void* threadfunc(void* thread_param)
 	data->thread_complete_success = false;
     }
 
-    DEBUG_LOG("Mutex unlocked. Ending thread.")
+    DEBUG_LOG("Mutex unlocked. Ending thread.");
 
     if (rc == 0) {
         data->thread_complete_success = true;
@@ -50,7 +50,7 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
     data->mutex = mutex;
     
     DEBUG_LOG("Creating Thread");
-    rc = pthread_create(thread, NULL, threadfunc, data);
+    int rc = pthread_create(thread, NULL, threadfunc, data);
     if (rc != 0) {
 	ERROR_LOG("Thread could not be created. Code: %d", rc);
     }
