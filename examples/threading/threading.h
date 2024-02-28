@@ -8,18 +8,14 @@
  * the joiner thread.
  */
 typedef struct thread_data {
-    /*
-     * TODO: add other values your thread will need to manage
-     * into this structure, use this structure to communicate
-     * between the start_thread_obtaining_mutex function and
-     * your thread implementation.
-     */
-
     /**
      * The mutex used to lock this data when manipulating values, for thread safety
      */
     pthread_mutex_t *mutex;
-
+    
+    /**
+     * Wait times for the thread.
+     */
     int obtain_wait;
     int release_wait;
 
