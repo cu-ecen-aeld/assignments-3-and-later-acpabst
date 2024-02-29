@@ -9,6 +9,8 @@ else
  $(info Cross compiling: $(CROSS_COMPILE_FULL)) 
 endif
 
+all: clean writer.o writer
+
 writer:  writer.o
 	$(CC) writer.o -o writer
 
