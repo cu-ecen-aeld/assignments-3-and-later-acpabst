@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <syslog.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
 
