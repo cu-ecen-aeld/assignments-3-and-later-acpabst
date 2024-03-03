@@ -190,11 +190,12 @@ int main (int argc, char*argv[]) {
 
     if (argc >= 2 && !strcmp(argv[1], "-d")) {
 	printf("Setting up as deamon.\n");
-	if (fork() < 0) {
+	int r = fork();
+	if (r < 0) {
             syslog(LOG_ERR, "Error creating deamon fork: %d", errno);
             printf("Error creating deamon fork: %d", errno);
 	    exit(-1);
-	} else if (fork() > 0) {
+	} else if (r > 0) {
 	    exit(0);
 	}
     }
