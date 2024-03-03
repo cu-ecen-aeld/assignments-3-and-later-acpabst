@@ -89,9 +89,10 @@ int open_socket() {
 
 void recieve_socket_data(int sockfd) {
     printf("socket id: %d\n", sockfd);
-    char buf[BUF_SIZE];    
+    char buf[BUF_SIZE+1];    
     ssize_t nrecv;
     ssize_t nwrit;
+    char *ptr_null;
     
     int output_file = open(OUTPUT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (output_file < 0) {
@@ -103,6 +104,7 @@ void recieve_socket_data(int sockfd) {
 
     do {
         nrecv = recv(sockfd, buf, BUF_SIZE, 0);
+	buf[nrecv] = 0;
 	printf("nrecv: %ld\n", nrecv);
 	if (nrecv < 0) {
             syslog(LOG_ERR, "Could not recieve data. Error: %d", errno);
@@ -119,8 +121,8 @@ void recieve_socket_data(int sockfd) {
             return;
         }
         printf("Written %ld data.\n", nwrit);
-
-    } while (nwrit == BUF_SIZE);
+	ptr_null = strchr(buf, '\n');
+    } while (ptr_null == NULL);
 
     close(output_file);
     return;
