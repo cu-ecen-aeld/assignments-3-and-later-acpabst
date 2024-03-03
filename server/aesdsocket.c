@@ -3,19 +3,7 @@
  * Author: Andy Pabst
  * Date 3/1/24 */
 
-#include <stddef.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <errno.h>
-#include <syslog.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <fcntl.h>
+#include "aesdsocket.h"
 
 #define BUF_SIZE 500
 
@@ -29,6 +17,7 @@ bool should_continue = true;
 
 static void signal_handler(int signal_number) {
     caught_a_signal = true;
+    should_continue = false;
     if (signal_number == SIGINT) {
         caught_sigint = true;
     }
@@ -37,119 +26,227 @@ static void signal_handler(int signal_number) {
     }
 }
 
-int main (int argc, char*argv[]) {
-
-    openlog(NULL, 0, LOG_USER);    
-    
-    printf("Starting.");
-
-    // set up signal handling
+void set_signal_handling() {
     struct sigaction new_action;
-    bool success = true;
     memset(&new_action, 0, sizeof(struct sigaction));
-    new_action.sa_handler = signal_handler;
+    new_action.sa_handler = signal_handler; 
     int sa = sigaction(SIGINT, &new_action, NULL);
     if (sa != 0) {
         syslog(LOG_ERR, "Failed to register for SIGINT. Error: %d", sa);
+        exit(-1);
     }
     sa = sigaction(SIGTERM, &new_action, NULL);
     if (sa != 0) {
         syslog(LOG_ERR, "Failed to register for SIGTERM. Error: %d", sa);
+        exit(-1);
     }
 
+    syslog(LOG_INFO, "Signal Handling set up complete.");
     printf("Signal handling set up.\n");
+}
 
+int open_socket() {
     struct addrinfo hints;
     struct addrinfo *serverinfo;
+    memset(&hints, 0, sizeof(hints));
 
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
     hints.ai_protocol = 0;
     hints.ai_addr = NULL;
-    
-    const char *port = "9000";
 
-    // open stream socket
-    int r = getaddrinfo(NULL, port, &hints, &serverinfo);
+    int r = getaddrinfo(NULL, PORT, &hints, &serverinfo);
     if (r != 0) {
         syslog(LOG_ERR, "getaddrinfo encountered an error: %d", r);
         printf("getaddrinfo encountered an error: %d\n", r);
-	return -1;
+        exit(-1);
     }
 
     int sfd = socket(serverinfo->ai_family, serverinfo->ai_socktype, serverinfo->ai_protocol);
     if (sfd == -1) {
         syslog(LOG_ERR, "Socket could not be created. Error: %d", errno);
         printf("Socket could not be created. Error: %d\n", errno);
-        return -1;
+        exit(-1);
+    }
+    const int opt_yes = 1;
+    r = setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &opt_yes, sizeof(opt_yes));
+    if (r == -1) {
+        syslog(LOG_ERR, "Socket options could not be set. Error: %d", errno);
+        printf("Socket options could not be set. Error: %d\n", errno);
+        exit(-1);
     }
 
     r = bind(sfd, serverinfo->ai_addr, serverinfo->ai_addrlen);
     if (r != 0) {
         syslog(LOG_ERR, "Socket failed to bind. Error: %d", errno);
         printf("Socket failed to bind. Error: %d\n", errno);
-	return -1;
+        exit(-1);
+    }
+    freeaddrinfo(serverinfo);
+    return sfd;
+}
+
+void recieve_socket_data(int sockfd) {
+    printf("socket id: %d\n", sockfd);
+    char buf[BUF_SIZE];    
+    ssize_t nrecv;
+    ssize_t nwrit;
+    
+    int output_file = open(OUTPUT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
+    if (output_file < 0) {
+        syslog(LOG_ERR, "Could not open file. Error: %d", errno);
+        printf("Could not open file. Error: %d\n", errno);
+        should_continue = false;
+	return;
+    }
+
+    do {
+        nrecv = recv(sockfd, buf, BUF_SIZE, 0);
+	printf("nrecv: %ld\n", nrecv);
+	if (nrecv < 0) {
+            syslog(LOG_ERR, "Could not recieve data. Error: %d", errno);
+            printf("Could not recieve data. Error: %d\n", errno);
+            should_continue = false;
+            return;
+        }
+        printf("Recieved %ld data.\n", nrecv);
+
+        nwrit = write(output_file, buf, nrecv);
+        if (nwrit < 0) {
+            printf("Something went wrong: %i\n", errno);
+            should_continue = false;
+            return;
+        }
+        printf("Written %ld data.\n", nwrit);
+
+    } while (nwrit == BUF_SIZE);
+
+    close(output_file);
+    return;
+}
+
+void return_socket_data(int sockfd) {
+    printf("socket id: %d\n", sockfd);
+    char buf[BUF_SIZE];    
+    ssize_t nread;
+    ssize_t nsend;
+
+    int output_file = open(OUTPUT_FILE, O_RDONLY, 0666);
+    if (output_file < 0) {
+        syslog(LOG_ERR, "Could not open file. Error: %d", errno);
+        printf("Could not open file. Error: %d\n", errno);
+        should_continue = false;
+	return;
+    }
+
+    do {    
+        nread = read(output_file, buf, BUF_SIZE);
+	if (nread < 0) {
+            printf("Something went wrong: %i\n", errno);
+            should_continue = false;
+	    return;
+        }
+        printf("Read %ld data.\n", nread);
+	nsend = send(sockfd, buf, nread, 0);
+        if (nsend < 0) {
+            syslog(LOG_ERR, "Could not send data. Error: %d", errno);
+            printf("Could not send data. Error: %d\n", errno);
+	    should_continue = false;
+            return;
+        }
+        printf("Send %ld data.\n", nsend);
+    } while (nsend == BUF_SIZE);
+
+    close(output_file);
+    return;
+}
+
+void graceful_socket_shutdown(int sockfd) { 
+    int r = shutdown(sockfd,SHUT_RDWR);
+    if (r != 0) {
+	    printf("wrong 1: %d\n", errno);
+    }
+    r = close(sockfd);
+    if (r != 0) {
+            printf("wrong 3: %d\n", errno);
+    }
+    remove(OUTPUT_FILE);
+}
+
+/* 
+ * --------- MAIN --------- 
+ */
+int main (int argc, char*argv[]) {
+
+    openlog(NULL, 0, LOG_USER);    
+
+    set_signal_handling();
+
+    char buf[BUF_SIZE];
+    size_t nread;
+    
+    int sfd = open_socket();
+
+    if (argc >= 2 && !strcmp(argv[1], "-d")) {
+	printf("Setting up as deamon.\n");
+	if (fork() < 0) {
+            syslog(LOG_ERR, "Error creating deamon fork: %d", errno);
+            printf("Error creating deamon fork: %d", errno);
+	    exit(-1);
+	} else if (fork() > 0) {
+	    exit(0);
+	}
     }
     
-    while(!caught_a_signal && should_continue) {
-	//printf("Entering while loop.");
-	// listen for and accept connection
-	r = listen(sfd, 1);
+    do {	
+        // listen for and accept connection
+	int r = listen(sfd, 10);
 	if (r != 0) {
 	    syslog(LOG_ERR, "Error while listening on socket: %d", errno);
 	    printf("Error while listening on socket: %d\n", errno);
+	    graceful_socket_shutdown(sfd);
+	    exit(-1);
 	}
-	struct sockaddr peer;
-	socklen_t peer_addr_size;
+
+        printf("Waiting for new conntection . . .\n");
+        struct sockaddr peer;
+        socklen_t peer_addr_size = sizeof(peer);
+        memset(&peer, 0, sizeof(peer));   //make sure struct is empty
+
+
 	int pfd = accept(sfd, &peer, &peer_addr_size); 
 	if (pfd == -1) {
-	    syslog(LOG_ERR, "Error while acceptin connection: %d", errno);
-	    printf("Error while acceptin connection: %d\n", errno);
-	}
-	syslog(LOG_INFO, "Accepted connection from %s", peer.sa_data);
-	printf("Accepted connection from %s\n", peer.sa_data);
-
-        // recieve data
-	int output_file = open("/var/tmp/aesdsocketdata", O_RDWR | O_CREAT | O_APPEND, 0666);
-        if (output_file < 0) {
-	    syslog(LOG_ERR, "Could not open file. Error: %d", errno);
-	    printf("Could not open file. Error: %d\n", errno);
-	    break;
-	}
-	char buf[BUF_SIZE];
-        ssize_t nread;
-	char test[] = "123abc";
-
-	do {
-            nread = recv(sfd, buf, BUF_SIZE, 0);
-	    if (nread < 0) {
-	        syslog(LOG_ERR, "Could not recieve data. Error: %d", errno);
-		printf("Could not recieve data. Error: %d\n", errno);
-		should_continue = false;
-	        break;
+	    if (errno == 4) {
+                break;
 	    }
-	    printf("Recieved %ld data.\n", nread);
-            //ssize_t nr = write(output_file, buf, BUF_SIZE);
-            ssize_t nr = write(output_file, test, 6);
-	    if (nr < 0) {
-		printf("Something went wrong: %i\n", errno);
-		should_continue = false;
+	    syslog(LOG_ERR, "Error while accepting connection: %d", errno);
+	    printf("Error while accepting connection: %d\n", errno);
+	    graceful_socket_shutdown(sfd);
+	    exit(-1);
+	}
+	char client[INET6_ADDRSTRLEN];
+	inet_ntop(peer.sa_family, peer.sa_data, client, sizeof(client));
+	syslog(LOG_INFO, "Accepted connection from %s", client);
+	printf("Accepted connection from %s\n", client);
+
+	recieve_socket_data(pfd);
+	if (!should_continue) {
 		break;
-	    }
-	    printf("Written %ld data.\n", nr);
-	} while (nread == BUF_SIZE);
+	}
+	return_socket_data(pfd);
+        syslog(LOG_INFO, "Closing connection at %s", client);
+        printf("Closing connection at %s\n", client);
+        shutdown(pfd,SHUT_RDWR);
+        close(pfd);   
+    } while(!caught_a_signal && should_continue);
 
-        syslog(LOG_INFO, "Closing connection at %s", peer.sa_data);
-	close(sfd);
-    }
- 
-               
     if (caught_sigint || caught_sigterm) {
-        close(sfd);
-	freeaddrinfo(serverinfo);
-	//TODO delete file
-        syslog(LOG_INFO, "Caught signal, exiting.");
-	exit(0);	
+	syslog(LOG_INFO, "Caught signal, exiting.");
+        printf("Caught signal, exiting.");
+        graceful_socket_shutdown(sfd);
+        remove(OUTPUT_FILE);
+	
     }
+    exit(0);
 }
