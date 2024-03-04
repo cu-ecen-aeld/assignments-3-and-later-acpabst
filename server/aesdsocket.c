@@ -149,6 +149,7 @@ void return_socket_data(int sockfd) {
 }
 
 void graceful_socket_shutdown(int sockfd) { 
+    printf("Shutting down aesdsocket.");
     int r = shutdown(sockfd,SHUT_RDWR);
     if (r != 0) {
         syslog(LOG_ERR, "Socket shutdown failed. Error: %d", errno);
@@ -165,6 +166,7 @@ void graceful_socket_shutdown(int sockfd) {
  */
 int main (int argc, char*argv[]) {
 
+    printf("Beginning aesdsocket!");
     openlog(NULL, 0, LOG_USER);    
 
     set_signal_handling();
@@ -197,6 +199,7 @@ int main (int argc, char*argv[]) {
         socklen_t peer_addr_size = sizeof(peer);
         memset(&peer, 0, sizeof(peer));   //make sure struct is empty
 
+        printf("Waiting for connection . . .");
 
 	int pfd = accept(sfd, &peer, &peer_addr_size); 
 	if (pfd == -1) {
