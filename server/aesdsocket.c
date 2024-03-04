@@ -166,7 +166,7 @@ void graceful_socket_shutdown(int sockfd) {
  */
 int main (int argc, char*argv[]) {
 
-    printf("Beginning aesdsocket!");
+    printf("Beginning aesdsocket!\n");
     openlog(NULL, 0, LOG_USER);    
 
     set_signal_handling();
@@ -180,6 +180,7 @@ int main (int argc, char*argv[]) {
 	int r = fork();
 	if (r < 0) {
             syslog(LOG_ERR, "Error creating deamon fork: %d", errno);
+            printf("Error creating deamon fork: %d\n", errno);
 	    exit(-1);
 	} else if (r > 0) {
 	    exit(0);
@@ -191,6 +192,7 @@ int main (int argc, char*argv[]) {
 	int r = listen(sfd, 10);
 	if (r != 0) {
 	    syslog(LOG_ERR, "Error while listening on socket: %d", errno);
+	    printf("Error while listening on socket: %d\n", errno);
 	    graceful_socket_shutdown(sfd);
 	    exit(-1);
 	}
@@ -199,7 +201,7 @@ int main (int argc, char*argv[]) {
         socklen_t peer_addr_size = sizeof(peer);
         memset(&peer, 0, sizeof(peer));   //make sure struct is empty
 
-        printf("Waiting for connection . . .");
+        printf("Waiting for connection . . .\n");
 
 	int pfd = accept(sfd, &peer, &peer_addr_size); 
 	if (pfd == -1) {
@@ -207,12 +209,14 @@ int main (int argc, char*argv[]) {
                 break;
 	    }
 	    syslog(LOG_ERR, "Error while accepting connection: %d", errno);
+	    printf("Error while accepting connection: %d\n", errno);
 	    graceful_socket_shutdown(sfd);
 	    exit(-1);
 	}
 	char client[INET6_ADDRSTRLEN];
 	inet_ntop(peer.sa_family, peer.sa_data, client, sizeof(client));
 	syslog(LOG_INFO, "Accepted connection from %s", client);
+	printf("Accepted connection from %s\n", client);
 
 	recieve_socket_data(pfd);
 	if (!should_continue) {
@@ -220,12 +224,14 @@ int main (int argc, char*argv[]) {
 	}
 	return_socket_data(pfd);
         syslog(LOG_INFO, "Closing connection at %s", client);
+        printf("Closing connection at %s\n", client);
         shutdown(pfd,SHUT_RDWR);
         close(pfd);   
     } while(!caught_a_signal && should_continue);
 
     if (caught_sigint || caught_sigterm) {
 	syslog(LOG_INFO, "Caught signal, exiting.");
+	printf("Caught signal, exiting.\n");
         graceful_socket_shutdown(sfd);
         remove(OUTPUT_FILE);
 	
