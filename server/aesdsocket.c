@@ -42,6 +42,7 @@ void set_signal_handling() {
     }
 
     syslog(LOG_INFO, "Signal Handling set up complete.");
+    printf("Signal handling set up.\n");
 }
 
 int open_socket() {
@@ -83,7 +84,6 @@ int open_socket() {
 }
 
 void recieve_socket_data(int sockfd) {
-    printf("socket id: %d\n", sockfd);
     char buf[BUF_SIZE+1];    
     ssize_t nrecv;
     ssize_t nwrit;
