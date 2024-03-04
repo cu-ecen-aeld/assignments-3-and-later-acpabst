@@ -99,7 +99,6 @@ void recieve_socket_data(int sockfd) {
     do {
         nrecv = recv(sockfd, buf, BUF_SIZE, 0);
 	buf[nrecv] = 0;
-	printf("nrecv: %ld\n", nrecv);
 	if (nrecv < 0) {
             syslog(LOG_ERR, "Could not recieve data. Error: %d", errno);
             should_continue = false;
