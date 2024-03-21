@@ -49,7 +49,6 @@ void set_signal_handling() {
     }
     sa = sigaction(SIGALRM, &new_action, NULL);
     if (sa != 0) {
-	printf("caught the alarm!\n");
         syslog(LOG_ERR, "Failed to register for SIGALRM. Error: %d", sa);
         exit(-1);
     }
@@ -201,7 +200,7 @@ void* accept_connection_thread(void* thread_param) {
 
     syslog(LOG_INFO, "Closing connection at %s", client);
     printf("Closing connection at %s\n", client);
-    //shutdown(pfd,SHUT_RDWR);
+    shutdown(pfd,SHUT_RDWR);
     close(pfd);
     // exit thread upon successful completion
     data->thread_complete_success = true;
@@ -229,7 +228,6 @@ int recieve_socket_data(int sockfd) {
 	    return -1;
         }
 
-        printf("Writing to file . . .\n");
 	nwrit = write(output_file, buf, nrecv);
         if (nwrit < 0) {
 	    close(output_file);
@@ -255,7 +253,6 @@ int return_socket_data(int sockfd) {
     }
 
     do {    
-	printf("Reading from file . . .\n");
         nread = read(output_file, buf, BUF_SIZE);
 	if (nread < 0) {
 	    close(output_file);
@@ -275,7 +272,7 @@ int return_socket_data(int sockfd) {
 
 void graceful_socket_shutdown(int sockfd, struct slisthead *head) {
 
-    printf("Shutting down aesdsocket.");
+    printf("Shutting down aesdsocket.\n");
 
     // exit all threads
     slist_data_t *datap=NULL;
@@ -335,7 +332,6 @@ int main (int argc, char*argv[]) {
         printf("Error creating timer fork: %d\n", errno);
 	exit(-1);
     } else if (r == 0) {
-	printf("Child!\n");
 	ten_second_timer(&mutex);
     }
 
@@ -370,7 +366,6 @@ int main (int argc, char*argv[]) {
         memset(&peer, 0, sizeof(peer));   //make sure struct is empty
 
         printf("Waiting for connection . . .\n");
-	printf("Counter: %d\n", counter);
 
 	int pfd = accept(sfd, &peer, &peer_addr_size); 
 	if (pfd == -1) {
@@ -412,21 +407,17 @@ int main (int argc, char*argv[]) {
 
 	    if(counter > 1) {
 	    SLIST_FOREACH_SAFE(datap, &head, entries, datap_temp) {
-                printf("Thread in list: %ld :: Status: %d\n", datap->thread_id, datap->tdata->thread_complete_success);
                 if (datap->tdata->thread_complete_success = true) {
-		    // TODO free thread data here
 		    pthread_join(datap->thread_id, NULL);
 		    syslog(LOG_INFO, "Joined thread %ld", datap->thread_id);
 		    printf("Joined thread %ld\n", datap->thread_id);
 		    SLIST_REMOVE(&head, datap, slist_data_s, entries);
 		}
             }
-	    printf("Reached here!\n");
 	    free(datap);
 	    free(datap_temp);
 	    }   
 	}
-	printf("Reached end of loop\n");
     } while(!caught_a_signal);
 
     if (caught_sigint || caught_sigterm) {
