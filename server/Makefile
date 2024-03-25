@@ -1,5 +1,5 @@
-CC = gcc
-CFLAGS = -g -pthread
+CC ?= gcc
+CFLAGS ?= -g -pthread
 
 ifeq ($(CROSS_COMPILE),)
  $(info Compiling natively.)
