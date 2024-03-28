@@ -45,7 +45,7 @@ void set_signal_handling() {
     sa = sigaction(SIGTERM, &new_action, NULL);
     if (sa != 0) {
         syslog(LOG_ERR, "Failed to register for SIGTERM. Error: %d", sa);
-        exit(-1);
+	exit(-1);
     }
     sa = sigaction(SIGALRM, &new_action, NULL);
     if (sa != 0) {
@@ -81,6 +81,7 @@ void ten_second_timer(pthread_mutex_t *mutex) {
 
     while(should_continue) {
         if(caught_sigalrm) {
+	    printf("Sigalarm caught. Printing timestamp.\n");
 	    // get and format local wall time
 	    t = time(NULL);
 	    tmp = localtime(&t);
@@ -104,13 +105,16 @@ void ten_second_timer(pthread_mutex_t *mutex) {
 	    int output_file = open(OUTPUT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
             if (output_file < 0) {
                 syslog(LOG_ERR, "Could not open file. Error: %d", errno);
-	        close(output_file);
+	        printf("Could not open file. Error: %d\n", errno);
+		close(output_file);
                 pthread_mutex_unlock(mutex);
 	        exit(-1);
             }
             r = write(output_file, header, sizeof(header));
             r = write(output_file, outstr, num_char + 1);
             if (r < 0) {
+		syslog(LOG_ERR, "Could not print to file. Error: %d", r);
+		printf("Could not print to file. Error: %d\n", r);
 	        close(output_file);
                 pthread_mutex_unlock(mutex);
 		exit(-1);
