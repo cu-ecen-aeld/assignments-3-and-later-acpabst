@@ -1,5 +1,6 @@
 CC ?= gcc
 CFLAGS ?= -g -pthread
+LDFLAGS ?= -lm
 
 ifeq ($(CROSS_COMPILE),)
  $(info Compiling natively.)
@@ -12,10 +13,10 @@ endif
 all: clean aesdsocket.o aesdsocket
 
 aesdsocket: aesdsocket.o
-	$(CC) $(CFLAGS) aesdsocket.o -o aesdsocket
+	$(CC) $(CFLAGS) aesdsocket.o -o aesdsocket $(LDFLAGS)
 
 aesdsocket.o: aesdsocket.c
-	$(CC) $(CFLAGS) -c aesdsocket.c -o aesdsocket.o
+	$(CC) $(CFLAGS) -c aesdsocket.c -o aesdsocket.o $(LDFLAGS)
 
 clean:
 	rm -f aesdsocket aesdsocket.o
