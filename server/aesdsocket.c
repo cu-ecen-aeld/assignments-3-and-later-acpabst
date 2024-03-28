@@ -100,6 +100,7 @@ void ten_second_timer(pthread_mutex_t *mutex) {
 	    
             // write timestamp to file
 	    r = pthread_mutex_lock(mutex);
+	    printf("Printing timestamp: %s", outstr);
 	    int output_file = open(OUTPUT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
             if (output_file < 0) {
                 syslog(LOG_ERR, "Could not open file. Error: %d", errno);
