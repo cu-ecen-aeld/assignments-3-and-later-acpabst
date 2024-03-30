@@ -29,7 +29,7 @@ static void signal_handler(int signal_number) {
         should_continue = false;
     }
     if (signal_number == SIGALRM) {
-        caught_sigalrm = true;
+	caught_sigalrm = true;
     }
 }
 
@@ -78,8 +78,12 @@ void ten_second_timer(pthread_mutex_t *mutex) {
 	printf("Failed to create timer. Error: %d\n", errno);
 	exit(-1);
     }
-
+    /**/
+    printf("In timer. Alarm should be set. Should continue: %d\n", should_continue);
+    /**/
     while(should_continue) {
+	/**/
+	sleep(0.01);
         if(caught_sigalrm) {
 	    printf("Sigalarm caught. Printing timestamp.\n");
 	    // get and format local wall time
@@ -123,6 +127,7 @@ void ten_second_timer(pthread_mutex_t *mutex) {
 	    caught_sigalrm = false;
         }
     }
+    printf("Exiting Timer Process. . . \n");
     exit(0);
 }
 
@@ -329,17 +334,6 @@ int main (int argc, char*argv[]) {
         exit(-1);
     }
 
-    // set up timer process
-    printf("Creating timer . . .\n");
-    r = fork();
-    if (r < 0) {
-        syslog(LOG_ERR, "Error creating timer fork: %d", errno);
-        printf("Error creating timer fork: %d\n", errno);
-	exit(-1);
-    } else if (r == 0) {
-	ten_second_timer(&mutex);
-    }
-
     char buf[BUF_SIZE];
     size_t nread;
     
@@ -357,6 +351,7 @@ int main (int argc, char*argv[]) {
     }
     
     int counter = 0;
+    bool start_timer = true;
     do {	
         // listen for and accept connection
 	int r = listen(sfd, 10);
@@ -421,7 +416,21 @@ int main (int argc, char*argv[]) {
             }
 	    free(datap);
 	    free(datap_temp);
-	    }   
+	    }
+	}   
+	// after the first connection is made, set up the timer.
+	if (start_timer) {
+            // set up timer process
+            printf("Creating timer . . .\n");
+            r = fork();
+            if (r < 0) {
+                syslog(LOG_ERR, "Error creating timer fork: %d", errno);
+                printf("Error creating timer fork: %d\n", errno);
+	        exit(-1);
+            } else if (r == 0) {
+	        ten_second_timer(&mutex);
+            }
+	    start_timer = false;
 	}
     } while(!caught_a_signal);
 
