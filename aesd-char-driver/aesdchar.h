@@ -23,6 +23,7 @@
 #  define PDEBUG(fmt, args...) /* not debugging: nothing */
 #endif
 
+#include "aesd-circular-buffer.h"
 
 struct aesd_dev
 {
@@ -31,7 +32,7 @@ struct aesd_dev
      */
     //mutex* aesd_mutex
     /* Circular buffer */
-    struct aesd_circular_buffer buffer;
+    struct aesd_circular_buffer* buffer;
    
     /* TODO Partial buffer */    
     

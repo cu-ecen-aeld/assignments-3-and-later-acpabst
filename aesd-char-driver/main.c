@@ -17,11 +17,12 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
+#include <linux/slab.h>
 
 #include <linux/mutex.h>
 
 #include "aesdchar.h"
-#include "aesd-circular-buffer.h"
+
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -30,15 +31,16 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
 struct mutex mutex;
+//struct aesd_circular_buffer *buffer;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
-    PDEBUG("open");
     /**
      * TODO: handle open
      */
+    struct aesd_dev *dev;
+	
     PDEBUG("Open\n");
-    struct aesd_dev *dev
     dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
     filp->private_data = dev;
     
@@ -58,19 +60,20 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = 0;
+    size_t read_count = 0;
+    uint i;
+    struct aesd_dev *aesd_device = filp->private_data; 
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
-    /**
-     * TODO: handle read
-     */
+   
     // TODO obtain mutex
     
-    size_t read_count = 0;
-    if(!filp->private_data->buffer->full) {
-        for(uint8 i = filp->private_data->buffer->out_offs, i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, i++) {
-	    if(read_count + filp->private_data->buffer->entry[i]->size < count) {
+    if(!aesd_device->buffer->full) {
+	i = aesd_device->buffer->out_offs;
+        for(i; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+	    if(read_count + aesd_device->buffer->entry[i].size < count) {
 	        // if we have room for the entire entry
-		buf[read_count] = filp->private_data->buffer->entry[i]->buffptr;
-		read_count += filp->private_data->buffer->entry[i]->size;
+		buf[read_count] = aesd_device->buffer->entry[i].buffptr;
+		read_count += aesd_device->buffer->entry[i].size;
 	    } else {
 		// we will run over the requested number of bytes, partial read
 		// TODO
@@ -78,11 +81,12 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	    }
 	}
     }
-    for(uint8 i = 0; i < filp->private_data->buffer->out_offs, i++) {
-        if(read_count + filp->private_data->buffer->entry[i]->size < count) {
+    i = 0;
+    for(i; i < aesd_device->buffer->out_offs; i++) {
+        if(read_count + aesd_device->buffer->entry[i].size < count) {
             // if we have room for the entire entry
-            buf[read_count] = filp->private_data->buffer->entry[i]->buffptr;
-            read_count += filp->private_data->buffer->entry[i]->size;
+            buf[read_count] = aesd_device->buffer->entry[i].buffptr;
+            read_count += aesd_device->buffer->entry[i].size;
          } else {
             // we will run over the requested number of bytes, partial read
             // TODO
@@ -90,24 +94,24 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
          } 	
     }
     // TODO release mutex
-
-    return read_count;
+    retval = read_count;
+    return retval;
 }
 
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
-    PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
-    /**
-     * TODO: handle write
-     */
+    struct aesd_dev *aesd_device = filp->private_data;
     // create entry from buffer and count provided
     struct aesd_buffer_entry *add_entry;
-    aesd_buffer_entry->size = count;
     // kmalloc a buffer to store the data we are given
     char *data = kmalloc(count, GFP_KERNEL);
-    for(unsigned int i = 0; i < count; i++) {
+    uint i = 0;
+    add_entry->size = count;
+    PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
+
+    for(i; i < count; i++) {
        // TODO if null character, set flag
        // 	if the flag is set, write to buffer, else write to partial buffer
        data[i] = buf[i];
@@ -115,9 +119,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     add_entry->buffptr = data;
     // TODO obtain mutex here
     // add created entry to the buffer
-    aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, add_entry)
+    aesd_circular_buffer_add_entry(aesd_device->buffer, add_entry);
     // TODO release mutex
-    return count;
+    retval = count;
+    return retval;
 }
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
@@ -147,6 +152,9 @@ int aesd_init_module(void)
 {
     dev_t dev = 0;
     int result;
+
+    struct aesd_circular_buffer *buffer;
+
     result = alloc_chrdev_region(&dev, aesd_minor, 1,
             "aesdchar");
     aesd_major = MAJOR(dev);
@@ -164,11 +172,11 @@ int aesd_init_module(void)
     //mutex_init(&aesd_mutex);
     //aesd_device.aesd_mutex = *mutex;
     PDEBUG("Initialize device");
-    aesd_circular_buffer_init(struct aesd_circular_buffer *buffer);
-    aesd_device->buffer = buffer;
-    aesd_device->buffer->full = false;
-    aesd_device->buffer->in_offs = 0;
-    aesd_device->buffer->out_offs = 0;
+    aesd_circular_buffer_init(buffer);
+    aesd_device.buffer = buffer;
+    aesd_device.buffer->full = false;
+    aesd_device.buffer->in_offs = 0;
+    aesd_device.buffer->out_offs = 0;
      
     result = aesd_setup_cdev(&aesd_device);
 
@@ -181,6 +189,9 @@ int aesd_init_module(void)
 
 void aesd_cleanup_module(void)
 {
+    size_t index;
+    struct aesd_buffer_entry *entry;
+    
     dev_t devno = MKDEV(aesd_major, aesd_minor);
 
     cdev_del(&aesd_device.cdev);
@@ -188,13 +199,11 @@ void aesd_cleanup_module(void)
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
-    size_t index;
-    struct aesd_buffer_entry *entry;
-    AESD_CIRCULAR_BUFFER_FOREACH(entry,&buffer,index) {
-        free(entry->buffptr);
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device.buffer, index) {
+        kfree(entry->buffptr);
     }
-    free(entry);
-    free(aesd_device);
+    //kfree(entry);
+    //kfree(aesd_device);
 
     unregister_chrdev_region(devno, 1);
 }
