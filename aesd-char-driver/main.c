@@ -118,6 +118,12 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     // add created entry to the buffer
     aesd_circular_buffer_add_entry(aesd_device->buffer, add_entry);
     // TODO release mutex
+  
+  
+    // free memory? I think this is the wrong place to do this
+    kfree(add_entry);
+    kfree(data);
+
     retval = count;
     return retval;
 }
