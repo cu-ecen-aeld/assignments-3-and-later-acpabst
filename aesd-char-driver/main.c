@@ -68,8 +68,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     // TODO obtain mutex
     
     if(!aesd_device->buffer->full) {
-	i = aesd_device->buffer->out_offs;
-        for(i; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+	for(i =  aesd_device->buffer->out_offs; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
 	    if(read_count + aesd_device->buffer->entry[i].size < count) {
 	        // if we have room for the entire entry
 		buf[read_count] = aesd_device->buffer->entry[i].buffptr;
@@ -81,8 +80,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	    }
 	}
     }
-    i = 0;
-    for(i; i < aesd_device->buffer->out_offs; i++) {
+    for(i = 0; i < aesd_device->buffer->out_offs; i++) {
         if(read_count + aesd_device->buffer->entry[i].size < count) {
             // if we have room for the entire entry
             buf[read_count] = aesd_device->buffer->entry[i].buffptr;
@@ -104,14 +102,13 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     ssize_t retval = -ENOMEM;
     struct aesd_dev *aesd_device = filp->private_data;
     // create entry from buffer and count provided
-    struct aesd_buffer_entry *add_entry;
+    struct aesd_buffer_entry *add_entry = kmalloc(sizeof(*add_entry),GFP_KERNEL); 
     // kmalloc a buffer to store the data we are given
     char *data = kmalloc(count, GFP_KERNEL);
-    uint i = 0;
+    uint i;
     add_entry->size = count;
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
-
-    for(i; i < count; i++) {
+    for(i = 0; i < count; i++) {
        // TODO if null character, set flag
        // 	if the flag is set, write to buffer, else write to partial buffer
        data[i] = buf[i];
