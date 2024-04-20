@@ -10,7 +10,6 @@ if grep -q '^staff:' /etc/group; then
 else
     group="wheel"
 fi
-
 if [ -e ${module}.ko ]; then
     echo "Loading local built file ${module}.ko"
     insmod ./$module.ko $* || exit 1

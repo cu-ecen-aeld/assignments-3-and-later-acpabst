@@ -22,6 +22,7 @@
 #include <linux/mutex.h>
 
 #include "aesdchar.h"
+#include "aesd-circular-buffer.h"
 
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
@@ -71,6 +72,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	for(i =  aesd_device->buffer->out_offs; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
 	    if(read_count + aesd_device->buffer->entry[i].size < count) {
 	        // if we have room for the entire entry
+		// TODO change to internal buffer (copy to user)
 		buf[read_count] = aesd_device->buffer->entry[i].buffptr;
 		read_count += aesd_device->buffer->entry[i].size;
 	    } else {
@@ -83,6 +85,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     for(i = 0; i < aesd_device->buffer->out_offs; i++) {
         if(read_count + aesd_device->buffer->entry[i].size < count) {
             // if we have room for the entire entry
+	    // TODO change to internal buffer (copy to user)
             buf[read_count] = aesd_device->buffer->entry[i].buffptr;
             read_count += aesd_device->buffer->entry[i].size;
          } else {
@@ -91,6 +94,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
             // don't forget to break the loop
          } 	
     }
+    // TODO copy_to_user
     // TODO release mutex
     retval = read_count;
     return retval;
@@ -175,11 +179,11 @@ int aesd_init_module(void)
     //mutex_init(&aesd_mutex);
     //aesd_device.aesd_mutex = *mutex;
     PDEBUG("Initialize device");
-    aesd_circular_buffer_init(buffer);
-    aesd_device.buffer = buffer;
-    aesd_device.buffer->full = false;
-    aesd_device.buffer->in_offs = 0;
-    aesd_device.buffer->out_offs = 0;
+    //aesd_circular_buffer_init(buffer);
+    //aesd_device.buffer = buffer;
+    //aesd_device.buffer->full = false;
+    //aesd_device.buffer->in_offs = 0;
+    //aesd_device.buffer->out_offs = 0;
      
     result = aesd_setup_cdev(&aesd_device);
 
@@ -202,9 +206,9 @@ void aesd_cleanup_module(void)
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
-    AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device.buffer, index) {
-        kfree(entry->buffptr);
-    }
+    //AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device.buffer, index) {
+    //    kfree(entry->buffptr);
+    //}
     //kfree(entry);
     //kfree(aesd_device);
 
