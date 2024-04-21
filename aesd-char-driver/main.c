@@ -110,8 +110,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     // kmalloc a buffer to store the data we are given
     char *data = kmalloc(count, GFP_KERNEL);
     uint i;
-    add_entry->size = count;
+   
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
+   
+    add_entry->size = count;
     for(i = 0; i < count; i++) {
        // TODO if null character, set flag
        // 	if the flag is set, write to buffer, else write to partial buffer
@@ -125,8 +127,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
   
   
     // free memory? I think this is the wrong place to do this
-    kfree(add_entry);
-    kfree(data);
+    //kfree(add_entry);
+    //kfree(data);
 
     retval = count;
     return retval;
@@ -159,8 +161,9 @@ int aesd_init_module(void)
 {
     dev_t dev = 0;
     int result;
+    struct aesd_circular_buffer *aesd_buffer = kmalloc(sizeof *aesd_buffer,GFP_KERNEL);
 
-    struct aesd_circular_buffer *buffer;
+    PDEBUG("Initialize device");
 
     result = alloc_chrdev_region(&dev, aesd_minor, 1,
             "aesdchar");
@@ -175,15 +178,15 @@ int aesd_init_module(void)
      * TODO: initialize the AESD specific portion of the device
      */
     // init locking primitive
-    // allocate memory if needed - do I need to allocate filp->private_data. See scull?
+    
     //mutex_init(&aesd_mutex);
     //aesd_device.aesd_mutex = *mutex;
-    PDEBUG("Initialize device");
-    //aesd_circular_buffer_init(buffer);
-    //aesd_device.buffer = buffer;
-    //aesd_device.buffer->full = false;
-    //aesd_device.buffer->in_offs = 0;
-    //aesd_device.buffer->out_offs = 0;
+    
+    aesd_circular_buffer_init(aesd_buffer);
+    aesd_device.buffer = aesd_buffer;
+    aesd_device.buffer->full = false;
+    aesd_device.buffer->in_offs = 0;
+    aesd_device.buffer->out_offs = 0;
      
     result = aesd_setup_cdev(&aesd_device);
 
@@ -196,21 +199,23 @@ int aesd_init_module(void)
 
 void aesd_cleanup_module(void)
 {
+    dev_t devno;
     size_t index;
     struct aesd_buffer_entry *entry;
     
-    dev_t devno = MKDEV(aesd_major, aesd_minor);
-
+    PDEBUG("De-initialize device");
+    
+    devno = MKDEV(aesd_major, aesd_minor);
     cdev_del(&aesd_device.cdev);
 
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
-    //AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device.buffer, index) {
-    //    kfree(entry->buffptr);
-    //}
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device.buffer, index) {
+        kfree(entry->buffptr);
+    }
     //kfree(entry);
-    //kfree(aesd_device);
+    kfree(aesd_device.buffer);
 
     unregister_chrdev_region(devno, 1);
 }
