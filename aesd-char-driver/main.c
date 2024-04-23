@@ -102,9 +102,13 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
             // don't forget to break the loop
          } 	
     }
-    retval = copy_to_user(buf, tmp_buf, count);
+    PDEBUG("Data to copy to user: %s", tmp_buf);
+
+    copy_to_user(buf, tmp_buf, count);
+    PDEBUG("read_count %i, count %i", read_count, count);
     // TODO release mutex
-    // retval = read_count;
+    retval = read_count;
+    kfree(tmp_buf);
     return retval;
 }
 
