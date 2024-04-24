@@ -78,6 +78,10 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 {
     if(buffer->full) {
 	// buffer is full - add to buffer at in_offs, advance both out_offs and in_offs
+	// subtract size we are removing
+	buffer->total_size -= buffer->entry[buffer->in_offs].size;
+	// add new size
+	buffer->total_size += add_entry->size;
 	buffer->entry[buffer->in_offs] = *add_entry;
 	if(buffer->in_offs + 1 == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
 	    // reached the end of the buffer again, start at the beginning
@@ -94,6 +98,7 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     }
     else {
 	// buffer is not full - add to buffer, increment in_offs
+	buffer->total_size += add_entry->size;
 	buffer->entry[buffer->in_offs] = *add_entry;
         if(buffer->in_offs + 1 == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
             // the buffer is now full

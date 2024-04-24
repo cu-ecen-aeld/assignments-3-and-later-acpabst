@@ -16,7 +16,7 @@
 #include <stdbool.h>
 #endif
 
-#define AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED 1
+#define AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED 10
 
 struct aesd_buffer_entry
 {
@@ -49,6 +49,11 @@ struct aesd_circular_buffer
      * set to true when the buffer entry structure is full
      */
     bool full;
+    /**
+     * total bytes stored in buffer
+     */
+    ssize_t total_size;
+
 };
 
 extern struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
