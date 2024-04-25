@@ -31,7 +31,7 @@ MODULE_AUTHOR("Andy Pabst"); /** TODO: fill in your name **/
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
-struct mutex mutex;
+struct mutex aesd_mutex;
 bool TMP_FLAG = false;
 
 int aesd_open(struct inode *inode, struct file *filp)
@@ -75,7 +75,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     PDEBUG("----READING----");
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
    
-    // TODO obtain mutex
+    // lock data
+    mutex_lock(aesd_device->aesd_mutex);
 
     if (*f_pos >= aesd_device->buffer->total_size) {
         // don't have enough data for this position
@@ -124,6 +125,9 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	}
     }
 
+    // unlock data
+    mutex_unlock(aesd_device->aesd_mutex);
+
     retval = copy_to_user(buf, tmp_buf, count);
     if (retval) {
 	    // copy data to user failed
@@ -169,7 +173,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	    PDEBUG("copy_to_user failed. Number of failed bytes: %li", retval);
 	    // TODO
     }
-    
+   
+    // lock data
+    mutex_lock(aesd_device->aesd_mutex);
+
     if (aesd_device->partial) {
         for (i = 0; i < aesd_device->partial_entry->size; i++) {
 	    tmp[i] = aesd_device->partial_entry->buffptr[i];
@@ -186,8 +193,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     } else {
     }
 
-    // TODO obtain mutex here
-    
     // check for new line character at the end of the buffer
     if (data[write_size-1] != '\n') {
         PDEBUG("Partial Write!");
@@ -211,7 +216,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         PDEBUG("in_offs now: %i", aesd_device->buffer->in_offs);
     }
 
-    // TODO release mutex
+    // unlock data
+    mutex_lock(aesd_device->aesd_mutex);
 
     kfree(tmp);
 
@@ -266,8 +272,8 @@ int aesd_init_module(void)
      */
     // init locking primitive
     
-    //mutex_init(&aesd_mutex);
-    //aesd_device.aesd_mutex = *mutex;
+    mutex_init(&aesd_mutex);
+    aesd_device.aesd_mutex = &aesd_mutex;
     
     aesd_circular_buffer_init(aesd_buffer);
     aesd_device.buffer = aesd_buffer;
