@@ -10,11 +10,28 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
+#include <linux/printk.h>
 #else
 #include <stddef.h> // size_t
 #include <stdint.h> // uintx_t
 #include <stdbool.h>
 #endif
+
+#define AESD_DEBUG 1  //Remove comment on this line to enable debug
+
+#undef PDEBUG             /* undef it, just in case */
+#ifdef AESD_DEBUG
+#  ifdef __KERNEL__
+     /* This one if debugging is on, and kernel space */
+#    define PDEBUG(fmt, args...) printk( KERN_DEBUG "aesdchar: " fmt, ## args)
+#  else
+     /* This one for user space */
+#    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ## args)
+#  endif
+#else
+#  define PDEBUG(fmt, args...) /* not debugging: nothing */
+#endif
+
 
 #define AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED 10
 
@@ -63,6 +80,8 @@ extern void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, 
 
 extern void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer);
 
+extern size_t aesd_circular_buffer_read_helper(struct aesd_circular_buffer *buffer, size_t index1, size_t index2,
+	    char* data, size_t count, size_t read_count, size_t byte_offset);
 /**
  * Create a for loop to iterate over each member of the circular buffer.
  * Useful when you've allocated memory for circular buffer entries and need to free it

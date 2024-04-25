@@ -10,6 +10,16 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
+
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/printk.h>
+#include <linux/types.h>
+#include <linux/cdev.h>
+#include <linux/fs.h> // file_operations
+#include <linux/slab.h>
+
+
 #else
 #include <string.h>
 #endif
@@ -39,14 +49,18 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     index = buffer->out_offs;
     entry = &(buffer->entry[index]);
     
+    if(char_offset == 0) {
+	// no offset, return first entry
+	entry_offset_byte_rtn = 0;
+        entry = &(buffer->entry[0]);
+	return entry;
+    }
+
     if(total_chars <= char_offset) {
         // there is not enough data in the buffer
         return NULL;
     }
-    //  prewrap if necessary
-    while(char_offset > total_chars) {
-	char_offset -= total_chars;
-    }
+    
     // find the entry where the requested char is
     while(offset_remaining >= entry->size) {
         offset_remaining -= entry->size;
@@ -117,3 +131,46 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 {
     memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
+
+
+/**
+ * Helper function for reading a specified section of the circular buffer
+ */
+extern size_t aesd_circular_buffer_read_helper(struct aesd_circular_buffer *buffer,
+	      size_t index1, size_t index2,
+	      char* data, size_t count, size_t read_count, size_t byte_offset)
+{
+    uint i = 0;	
+    uint j = 0;
+    uint k = 0;
+    char* tmp = kmalloc(count, GFP_KERNEL);
+    for(i = index1; i < index2; i++) {
+            if(buffer->entry[i].size == 0) {
+                // there is no more data, break loop
+                break;
+            }
+            PDEBUG("Going to read %zu from entry %i", buffer->entry[i].size, i);
+            if(read_count + buffer->entry[i].size < count) {
+                // if we have room for the entire entry
+		if (i == index1) {
+		   k = byte_offset;
+		} else {
+		   k = 0;
+		}
+                for(k; k < buffer->entry[i].size; k++) {
+		    tmp[j] = buffer->entry[i].buffptr[k];
+                    data[read_count + j] = buffer->entry[i].buffptr[k];
+		    j++;
+                }
+		PDEBUG("Data read: %s", tmp);
+		j=0;
+                read_count += buffer->entry[i].size;
+            } else {
+                // we will run over the requested number of bytes, partial read
+                // TODO
+                // don't forget to break the loop
+            }
+        }
+    return read_count;
+}
+

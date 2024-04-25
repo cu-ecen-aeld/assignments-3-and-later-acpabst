@@ -32,7 +32,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
 struct mutex mutex;
-//struct aesd_circular_buffer *buffer;
+bool TMP_FLAG = false;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
@@ -60,11 +60,15 @@ int aesd_release(struct inode *inode, struct file *filp)
 ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
 {
+    if(TMP_FLAG) {
+        *f_pos = 60;
+	TMP_FLAG = false;
+    }
     ssize_t retval = 0;
     size_t read_count = 0;
     uint i;
     uint k;
-    uint stop_index;
+    size_t start_entry_index;
     struct aesd_dev *aesd_device = filp->private_data; 
     char *tmp_buf = kmalloc(count, GFP_KERNEL);
     
@@ -73,55 +77,50 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
    
     // TODO obtain mutex
 
-    //if ((*f_pos)  aesd_device->buffer->total_size)
+    if (*f_pos >= aesd_device->buffer->total_size) {
+        // don't have enough data for this position
+	// this will happen if the function returns null, so maybe just put this in there?
+	// what to do? return an error?
+	return 0;
+    }
+
     size_t *byte_offset = kmalloc(sizeof(size_t),GFP_KERNEL);
     struct aesd_buffer_entry *point_entry;
     point_entry = aesd_circular_buffer_find_entry_offset_for_fpos(aesd_device->buffer, *f_pos, byte_offset); 
     // TODO if the entry is NULL
     if (point_entry == NULL) {
         PDEBUG("houston we have a problem");
+	start_entry_index = 0;
+	*byte_offset = 0;
     } else {
         // find the index of the returned entry
         for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) { 
 	    if (point_entry == &(aesd_device->buffer->entry[i])) {
-                stop_index = i;
+                start_entry_index = i;
 	        break;
 	    }
         }
     }
 
-    for(i = aesd_device->buffer->out_offs; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
-	if(aesd_device->buffer->entry[i].size == 0) {
-	    // there is no more data, break loop
-	    break;
-	}
-	PDEBUG("Going to read %zu from entry %i", aesd_device->buffer->entry[i].size, i);
-	if(read_count + aesd_device->buffer->entry[i].size < count) {
-            // if we have room for the entire entry
-	    for(k = 0; k < aesd_device->buffer->entry[i].size; k++) {
-		    tmp_buf[read_count + k] = aesd_device->buffer->entry[i].buffptr[k];
-            }
-            read_count += aesd_device->buffer->entry[i].size;
-         } else {
-            // we will run over the requested number of bytes, partial read
-            // TODO
-            // don't forget to break the loop
-         } 	
-    }
 
-    if(aesd_device->buffer->full) {
-	for(i = 0; i < aesd_device->buffer->out_offs; i++) {
-	    if(read_count + aesd_device->buffer->entry[i].size < count) {
-	        // if we have room for the entire entry
-	        for(k = 0; k < aesd_device->buffer->entry[i].size; k++) {
-		    tmp_buf[read_count + k] = aesd_device->buffer->entry[i].buffptr[k];
-                }
-		read_count += aesd_device->buffer->entry[i].size;
-	    } else {
-		// we will run over the requested number of bytes, partial read
-		// TODO
-		// don't forget to break the loop
-	    }
+    if (!aesd_device->buffer->full) {   
+        read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
+			start_entry_index, AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, 
+			tmp_buf, count, read_count, *byte_offset);
+    } else {
+        if (aesd_device->buffer->out_offs <= start_entry_index) {
+	    // seeked position is on the back of the buffer
+	    read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
+                        start_entry_index, AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, 
+                        tmp_buf, count, read_count, *byte_offset);
+	    read_count = aesd_circular_buffer_read_helper(aesd_device->buffer,
+                        0, aesd_device->buffer->out_offs,
+                        tmp_buf, count, read_count, *byte_offset);
+	} else {
+	    // seeked position is on the front of the buffer
+	    read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
+                        start_entry_index, aesd_device->buffer->out_offs, 
+                        tmp_buf, count, read_count, *byte_offset);
 	}
     }
 
