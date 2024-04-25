@@ -31,7 +31,7 @@ struct aesd_dev
      * TODO: Add structure(s) and locks needed to complete assignment requirements
      */
     /* Data locking mechanism */
-    struct mutex* aesd_mutex;
+    struct mutex* mutex;
     
     /* Circular buffer */
     struct aesd_circular_buffer* buffer;

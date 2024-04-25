@@ -306,7 +306,6 @@ void graceful_socket_shutdown(int sockfd, struct slisthead *head) {
     if (r != 0) {
         syslog(LOG_ERR, "Socket close failed. Error: %d", errno);
     }
-    remove(OUTPUT_FILE);
 }
 
 /* 
@@ -351,7 +350,7 @@ int main (int argc, char*argv[]) {
     }
     
     int counter = 0;
-    bool start_timer = true;
+    bool start_timer = false;   // Set to true to enable timestamping
     do {	
         // listen for and accept connection
 	int r = listen(sfd, 10);
@@ -438,8 +437,6 @@ int main (int argc, char*argv[]) {
 	syslog(LOG_INFO, "Caught signal, exiting.");
 	printf("Caught signal, exiting.\n");
         graceful_socket_shutdown(sfd, &head);
-        remove(OUTPUT_FILE);
-	
     }
     exit(0);
 }

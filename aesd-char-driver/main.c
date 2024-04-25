@@ -31,7 +31,6 @@ MODULE_AUTHOR("Andy Pabst"); /** TODO: fill in your name **/
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
-struct mutex aesd_mutex;
 bool TMP_FLAG = false;
 
 int aesd_open(struct inode *inode, struct file *filp)
@@ -74,35 +73,59 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     
     PDEBUG("----READING----");
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
-   
-    // lock data
-    mutex_lock(aesd_device->aesd_mutex);
+    
 
+    // lock data
+    i = mutex_is_locked(aesd_device->mutex);
+    if (i) {
+        PDEBUG("mutex already locked?");
+        return -ENOMEM;
+    } else {
+        PDEBUG("mutex is not already locked");
+    }
+    mutex_lock(aesd_device->mutex);
+    i = mutex_is_locked(aesd_device->mutex);
+    if (i) {
+        PDEBUG("successfully locked");
+    } else {
+        PDEBUG("did not lock");
+	return -ENOMEM;
+    }
+    
     if (*f_pos >= aesd_device->buffer->total_size) {
         // don't have enough data for this position
 	// this will happen if the function returns null, so maybe just put this in there?
 	// what to do? return an error?
+	mutex_unlock(aesd_device->mutex);
+	PDEBUG("fpos too big, unlocking mutex & returning");
 	return 0;
     }
 
+
     size_t *byte_offset = kmalloc(sizeof(size_t),GFP_KERNEL);
     struct aesd_buffer_entry *point_entry;
-    point_entry = aesd_circular_buffer_find_entry_offset_for_fpos(aesd_device->buffer, *f_pos, byte_offset); 
-    // TODO if the entry is NULL
-    if (point_entry == NULL) {
-        PDEBUG("houston we have a problem");
-	start_entry_index = 0;
-	*byte_offset = 0;
-    } else {
-        // find the index of the returned entry
-        for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) { 
-	    if (point_entry == &(aesd_device->buffer->entry[i])) {
-                start_entry_index = i;
-	        break;
-	    }
+    if (*f_pos != 0) {
+        point_entry = aesd_circular_buffer_find_entry_offset_for_fpos(aesd_device->buffer, *f_pos, byte_offset); 
+        // TODO if the entry is NULL
+        if (point_entry == NULL) {
+            PDEBUG("houston we have a problem");
+	    start_entry_index = 0;
+	    *byte_offset = 0;
+        } else {
+            // find the index of the returned entry
+            for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) { 
+	        if (point_entry == &(aesd_device->buffer->entry[i])) {
+                    start_entry_index = i;
+	            break;
+	        }
+            }
         }
+    } else {
+        start_entry_index = aesd_device->buffer->out_offs;
+	*byte_offset = 0;
     }
 
+    PDEBUG("start entry index: %li, outoffs: %li", start_entry_index, aesd_device->buffer->out_offs);
 
     if (!aesd_device->buffer->full) {   
         read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
@@ -125,8 +148,18 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	}
     }
 
+
     // unlock data
-    mutex_unlock(aesd_device->aesd_mutex);
+    mutex_unlock(aesd_device->mutex);
+    i = mutex_is_locked(aesd_device->mutex);
+    if (!i) {
+	PDEBUG("successfully unlocked");
+    } else {
+	PDEBUG("did not unlock");
+	return -ENOMEM;
+    }
+    // unlock data
+  //  mutex_unlock(aesd_device->mutex);
 
     retval = copy_to_user(buf, tmp_buf, count);
     if (retval) {
@@ -175,7 +208,21 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
    
     // lock data
-    mutex_lock(aesd_device->aesd_mutex);
+    i = mutex_is_locked(aesd_device->mutex);
+    if (i) {
+        PDEBUG("mutex already locked?");
+        return -ENOMEM;
+    } else {
+        PDEBUG("mutex is not already locked");
+    }
+    mutex_lock(aesd_device->mutex);
+    i = mutex_is_locked(aesd_device->mutex);
+    if (i) {
+        PDEBUG("successfully locked");
+    } else {
+        PDEBUG("did not lock");
+	return -ENOMEM;
+    }
 
     if (aesd_device->partial) {
         for (i = 0; i < aesd_device->partial_entry->size; i++) {
@@ -192,7 +239,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	}
     } else {
     }
-
+ 
     // check for new line character at the end of the buffer
     if (data[write_size-1] != '\n') {
         PDEBUG("Partial Write!");
@@ -215,9 +262,16 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         aesd_circular_buffer_add_entry(aesd_device->buffer, add_entry);
         PDEBUG("in_offs now: %i", aesd_device->buffer->in_offs);
     }
-
+    
     // unlock data
-    mutex_lock(aesd_device->aesd_mutex);
+    mutex_unlock(aesd_device->mutex);
+    i = mutex_is_locked(aesd_device->mutex);
+    if (!i) {
+	PDEBUG("successfully unlocked");
+    } else {
+	PDEBUG("did not unlock");
+	return -ENOMEM;
+    }
 
     kfree(tmp);
 
@@ -253,6 +307,7 @@ int aesd_init_module(void)
     dev_t dev = 0;
     int result;
     uint i;
+    struct mutex *aesd_mutex = kmalloc(sizeof(struct mutex), GFP_KERNEL);
     struct aesd_circular_buffer *aesd_buffer = kmalloc(sizeof(struct aesd_circular_buffer),GFP_KERNEL);
     struct aesd_buffer_entry *aesd_partial_entry = kmalloc(sizeof(struct aesd_buffer_entry),GFP_KERNEL);
 
@@ -272,10 +327,10 @@ int aesd_init_module(void)
      */
     // init locking primitive
     
-    mutex_init(&aesd_mutex);
-    aesd_device.aesd_mutex = &aesd_mutex;
-    
+    mutex_init(aesd_mutex);
     aesd_circular_buffer_init(aesd_buffer);
+
+    aesd_device.mutex = aesd_mutex;
     aesd_device.buffer = aesd_buffer;
     aesd_device.partial_entry = aesd_partial_entry;
     aesd_device.partial_entry->size = 0;
@@ -310,6 +365,7 @@ void aesd_cleanup_module(void)
     
     devno = MKDEV(aesd_major, aesd_minor);
     cdev_del(&aesd_device.cdev);
+    mutex_destroy(aesd_device.mutex);
 
     /**
      * TODO: cleanup AESD specific poritions here as necessary

@@ -22,9 +22,15 @@
 
 #include "queue.h"
 
+#define USE_AESD_CHAR_DEVICE 1
+
 #define PORT "9000"
-#define OUTPUT_FILE "/var/tmp/aesdsocketdata"
 #define BUF_SIZE 500
+
+#ifdef USE_AESD_CHAR_DEVICE
+#    define OUTPUT_FILE "/dev/aesdchar"
+#else
+#    define OUTPUT_FILE "/var/tmp/aesdsocketdata"
 
 typedef struct thread_data {
     pthread_mutex_t *mutex;
