@@ -34,8 +34,12 @@ struct aesd_dev
     /* Circular buffer */
     struct aesd_circular_buffer* buffer;
    
-    /* TODO Partial buffer */    
-    
+    /* Partial buffer */    
+    struct aesd_buffer_entry* partial_entry;
+
+    /* Partial buffer written bool */
+    bool partial;
+
     /* Char device structure */
     struct cdev cdev;     
 };

@@ -41,7 +41,7 @@ int aesd_open(struct inode *inode, struct file *filp)
      */
     struct aesd_dev *dev;
 	
-    PDEBUG("Open\n");
+    PDEBUG("Open");
     dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
     filp->private_data = dev;
     
@@ -50,7 +50,7 @@ int aesd_open(struct inode *inode, struct file *filp)
 
 int aesd_release(struct inode *inode, struct file *filp)
 {
-    PDEBUG("release");
+    PDEBUG("Release");
     /**
      * TODO: handle release
      */
@@ -83,9 +83,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     } else {
         // find the index of the returned entry
         for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) { 
-            PDEBUG("address point entry: %i address entry[i]: %i", point_entry, &(aesd_device->buffer->entry[i]));
 	    if (point_entry == &(aesd_device->buffer->entry[i])) {
-                PDEBUG("index found: %i",i);
                 stop_index = i;
 	        break;
 	    }
@@ -127,8 +125,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	}
     }
 
-    PDEBUG("Data to copy to user: %s", tmp_buf);
-
     retval = copy_to_user(buf, tmp_buf, count);
     if (retval) {
 	    // copy data to user failed
@@ -144,10 +140,10 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     kfree(tmp_buf);
     
     // update file position and return
-    PDEBUG("f_pos: %li", *f_pos);
+    PDEBUG("f_pos: %lld", *f_pos);
     if ((*f_pos) < aesd_device->buffer->total_size) {
 	(*f_pos) += read_count;
-	PDEBUG("f_pos now: %li", *f_pos);
+	PDEBUG("f_pos now: %lld", *f_pos);
         return retval;
     }
     PDEBUG("Reading complete.");
@@ -157,35 +153,68 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
+    uint i;
     ssize_t retval = -ENOMEM;
+    ssize_t write_size = count;
     struct aesd_dev *aesd_device = filp->private_data;
     // create entry from buffer and count provided
     struct aesd_buffer_entry *add_entry = kmalloc(sizeof(*add_entry),GFP_KERNEL); 
     // kmalloc a buffer to store the data we are given
     char *data = kmalloc(count, GFP_KERNEL);
-   
+    char *tmp = kmalloc(count + aesd_device->partial_entry->size, GFP_KERNEL);
+    
     PDEBUG("----WRITING----");
     retval = copy_from_user(data, buf, count);
     if (retval) {
 	    // copy data to user failed
-	    PDEBUG("copy_to_user failed. Number of failed bytes: %i", retval);
+	    PDEBUG("copy_to_user failed. Number of failed bytes: %li", retval);
 	    // TODO
     }
-   
-    PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
-   
-    add_entry->size = count;
-    add_entry->buffptr = data;
-    PDEBUG("data written: %s",add_entry->buffptr);
+    
+    if (aesd_device->partial) {
+        for (i = 0; i < aesd_device->partial_entry->size; i++) {
+	    tmp[i] = aesd_device->partial_entry->buffptr[i];
+	}
+	for (i = 0; i < count; i++) {
+       	    tmp[aesd_device->partial_entry->size + i] = data[i];
+	}
+	kfree(data);
+	*data = kmalloc(count+aesd_device->partial_entry->size, GFP_KERNEL);
+	write_size += aesd_device->partial_entry->size;
+	for (i = 0; i < write_size; i++) {
+	    data[i] = tmp[i];
+	}
+    } else {
+    }
+
     // TODO obtain mutex here
+    
+    // check for new line character at the end of the buffer
+    if (data[write_size-1] != '\n') {
+        PDEBUG("Partial Write!");
+        aesd_device->partial = true;
+        aesd_device->partial_entry->size = write_size;
+        aesd_device->partial_entry->buffptr = data;
+	// entry created is not needed
+	kfree(add_entry);
+    } else {
+        PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
+  
+        aesd_device->partial = false;	
+        add_entry->size = write_size;
+        add_entry->buffptr = data;
+        PDEBUG("data written: %s",add_entry->buffptr);
 
+        PDEBUG("in_offs: %i", aesd_device->buffer->in_offs);
 
-    PDEBUG("in_offs: %i", aesd_device->buffer->in_offs);
+        // add created entry to the buffer
+        aesd_circular_buffer_add_entry(aesd_device->buffer, add_entry);
+        PDEBUG("in_offs now: %i", aesd_device->buffer->in_offs);
+    }
 
-    // add created entry to the buffer
-    aesd_circular_buffer_add_entry(aesd_device->buffer, add_entry);
-    PDEBUG("in_offs now: %i", aesd_device->buffer->in_offs);
     // TODO release mutex
+
+    kfree(tmp);
 
     retval = count;
     return retval;
@@ -218,8 +247,9 @@ int aesd_init_module(void)
 {
     dev_t dev = 0;
     int result;
-    struct aesd_circular_buffer *aesd_buffer = kmalloc(sizeof(struct aesd_circular_buffer),GFP_KERNEL);
     uint i;
+    struct aesd_circular_buffer *aesd_buffer = kmalloc(sizeof(struct aesd_circular_buffer),GFP_KERNEL);
+    struct aesd_buffer_entry *aesd_partial_entry = kmalloc(sizeof(struct aesd_buffer_entry),GFP_KERNEL);
 
     PDEBUG("Initialize device");
 
@@ -242,10 +272,14 @@ int aesd_init_module(void)
     
     aesd_circular_buffer_init(aesd_buffer);
     aesd_device.buffer = aesd_buffer;
+    aesd_device.partial_entry = aesd_partial_entry;
+    aesd_device.partial_entry->size = 0;
+    aesd_device.partial = false;
     aesd_device.buffer->full = false;
     aesd_device.buffer->in_offs = 0;
     aesd_device.buffer->out_offs = 0;
     aesd_device.buffer->total_size = 0;
+
 
     for(i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
 	struct aesd_buffer_entry *add_entry = kmalloc(sizeof(*add_entry),GFP_KERNEL);
@@ -280,6 +314,7 @@ void aesd_cleanup_module(void)
 	kfree(entry->buffptr);
     }
     kfree(aesd_device.buffer);
+    kfree(aesd_device.partial_entry);
 
     unregister_chrdev_region(devno, 1);
 }
