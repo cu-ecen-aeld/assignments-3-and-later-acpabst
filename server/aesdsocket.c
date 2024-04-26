@@ -5,8 +5,6 @@
 
 #include "aesdsocket.h"
 
-#define BUF_SIZE 500
-
 bool caught_a_signal = false;
 bool caught_sigint = false;
 bool caught_sigterm = false;

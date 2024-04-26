@@ -25,13 +25,13 @@
 #define USE_AESD_CHAR_DEVICE 1
 
 #define PORT "9000"
-#define BUF_SIZE 500
+#define BUF_SIZE (1024*30)
 
 #ifdef USE_AESD_CHAR_DEVICE
 #    define OUTPUT_FILE "/dev/aesdchar"
 #else
 #    define OUTPUT_FILE "/var/tmp/aesdsocketdata"
-
+#endif
 typedef struct thread_data {
     pthread_mutex_t *mutex;
     bool thread_complete_success;

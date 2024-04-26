@@ -107,7 +107,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     if (*f_pos != 0) {
         point_entry = aesd_circular_buffer_find_entry_offset_for_fpos(aesd_device->buffer, *f_pos, byte_offset); 
         // TODO if the entry is NULL
-        if (point_entry == NULL) {
+        PDEBUG("check: %li",*byte_offset);
+	if (point_entry == NULL) {
             PDEBUG("houston we have a problem");
 	    start_entry_index = 0;
 	    *byte_offset = 0;
@@ -122,6 +123,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         }
     } else {
         start_entry_index = aesd_device->buffer->out_offs;
+	PDEBUG("check: %li %li", byte_offset, *byte_offset);
 	*byte_offset = 0;
     }
 
@@ -246,14 +248,17 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         aesd_device->partial = true;
         aesd_device->partial_entry->size = write_size;
         aesd_device->partial_entry->buffptr = data;
+	PDEBUG("size saved as partial: %li", write_size);
 	// entry created is not needed
 	kfree(add_entry);
     } else {
-        PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
+        PDEBUG("write %zu bytes with offset %lld",write_size,*f_pos);
   
         aesd_device->partial = false;	
         add_entry->size = write_size;
+	PDEBUG("getting here");
         add_entry->buffptr = data;
+	PDEBUG("getting here 2");
         PDEBUG("data written: %s",add_entry->buffptr);
 
         PDEBUG("in_offs: %i", aesd_device->buffer->in_offs);
