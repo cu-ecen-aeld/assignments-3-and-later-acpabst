@@ -106,7 +106,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     struct aesd_buffer_entry *point_entry;
     if (*f_pos != 0) {
         point_entry = aesd_circular_buffer_find_entry_offset_for_fpos(aesd_device->buffer, *f_pos, byte_offset); 
-        // TODO if the entry is NULL
+	// TODO if the entry is NULL
         PDEBUG("check: %li",*byte_offset);
 	if (point_entry == NULL) {
             PDEBUG("houston we have a problem");
@@ -123,30 +123,29 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         }
     } else {
         start_entry_index = aesd_device->buffer->out_offs;
-	PDEBUG("check: %li %li", byte_offset, *byte_offset);
 	*byte_offset = 0;
     }
 
     PDEBUG("start entry index: %li, outoffs: %li", start_entry_index, aesd_device->buffer->out_offs);
 
     if (!aesd_device->buffer->full) {   
-        read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
+        read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
 			start_entry_index, AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, 
-			tmp_buf, count, read_count, *byte_offset);
+			tmp_buf, count, byte_offset);
     } else {
         if (aesd_device->buffer->out_offs <= start_entry_index) {
 	    // seeked position is on the back of the buffer
-	    read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
+	    read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
                         start_entry_index, AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, 
-                        tmp_buf, count, read_count, *byte_offset);
-	    read_count = aesd_circular_buffer_read_helper(aesd_device->buffer,
+                        tmp_buf, count, byte_offset);
+	    read_count += aesd_circular_buffer_read_helper(aesd_device->buffer,
                         0, aesd_device->buffer->out_offs,
-                        tmp_buf, count, read_count, *byte_offset);
+                        tmp_buf, count, byte_offset);
 	} else {
 	    // seeked position is on the front of the buffer
-	    read_count = aesd_circular_buffer_read_helper(aesd_device->buffer, 
+	    read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
                         start_entry_index, aesd_device->buffer->out_offs, 
-                        tmp_buf, count, read_count, *byte_offset);
+                        tmp_buf, count, byte_offset);
 	}
     }
 
@@ -256,16 +255,11 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
   
         aesd_device->partial = false;	
         add_entry->size = write_size;
-	PDEBUG("getting here");
         add_entry->buffptr = data;
-	PDEBUG("getting here 2");
         PDEBUG("data written: %s",add_entry->buffptr);
-
-        PDEBUG("in_offs: %i", aesd_device->buffer->in_offs);
 
         // add created entry to the buffer
         aesd_circular_buffer_add_entry(aesd_device->buffer, add_entry);
-        PDEBUG("in_offs now: %i", aesd_device->buffer->in_offs);
     }
     
     // unlock data
@@ -283,12 +277,31 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     retval = count;
     return retval;
 }
+
+loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
+    loff_t newpos;
+    struct aesd_dev *aesd_device = filp->private_data;
+    loff_t max_file_size = AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED * (1024*30);
+    loff_t total_buffer_size = aesd_device->buffer->total_size;
+    PDEBUG("----SEEK----");
+    PDEBUG("whence: %i offset: %lli", whence, offset);
+    switch(whence) {
+    case SEEK_SET: case SEEK_CUR: case SEEK_END:
+        newpos = generic_file_llseek_size(filp, offset, whence, max_file_size, total_buffer_size);
+        PDEBUG("newpos: %lli", newpos);
+	return newpos;
+    default:
+        return -EINVAL;
+    }
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
+    .llseek =   aesd_llseek,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)

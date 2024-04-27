@@ -43,6 +43,7 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     struct aesd_buffer_entry *entry;
     size_t total_chars = 0;
     size_t offset_remaining = char_offset;
+    PDEBUG("offset remaining %li", offset_remaining);
     AESD_CIRCULAR_BUFFER_FOREACH(entry,buffer,index) {
          total_chars+= entry->size;
     }
@@ -52,7 +53,7 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     if(char_offset == 0) {
 	// no offset, return first entry
 	entry_offset_byte_rtn = 0;
-        entry = &(buffer->entry[0]);
+        entry = &(buffer->entry[buffer->out_offs]);
 	return entry;
     }
 
@@ -64,6 +65,7 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     // find the entry where the requested char is
     while(offset_remaining >= entry->size) {
         offset_remaining -= entry->size;
+	
 	if(index + 1 == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
 	    index = 0;
 	} else {
@@ -72,11 +74,13 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 	entry = &(buffer->entry[index]);
     }
     // set the byte number of the requested char
+    PDEBUG("offset remaining: %li size: %li", offset_remaining, entry->size);
     if(offset_remaining == entry->size) {
 	*entry_offset_byte_rtn = 0;
     } else {
 	*entry_offset_byte_rtn = offset_remaining;
     }
+    PDEBUG("return: %li", *entry_offset_byte_rtn);
     // return the entry where the char is located
     return entry;
 }
@@ -138,40 +142,40 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
  */
 extern size_t aesd_circular_buffer_read_helper(struct aesd_circular_buffer *buffer,
 	      size_t index1, size_t index2,
-	      char* data, size_t count, size_t read_count, size_t byte_offset)
+	      char* data, size_t count, size_t *byte_offset)
 {
     uint i = 0;	
     uint j = 0;
-    uint k = 0;
+    uint k = *byte_offset;
+    uint end = 0;
+    size_t read_count = 0;
     char* tmp = kmalloc(count, GFP_KERNEL);
-    PDEBUG(" %li %li %li %li %li,", index1, index2, count, read_count, byte_offset);
+    PDEBUG(" %li %li %li %li %li,", index1, index2, count, read_count, *byte_offset);
     for(i = index1; i < index2; i++) {
-            if(buffer->entry[i].size == 0) {
-                // there is no more data, break loop
-                break;
-            }
-            PDEBUG("Going to read %zu from entry %i", buffer->entry[i].size, i);
-            if(read_count + buffer->entry[i].size < count) {
-                // if we have room for the entire entry
-		if (i == index1) {
-		   k = byte_offset;
-		} else {
-		   k = 0;
-		}
-                for(k; k < buffer->entry[i].size; k++) {
-		    tmp[j] = buffer->entry[i].buffptr[k];
-                    data[read_count + j] = buffer->entry[i].buffptr[k];
-		    j++;
-                }
-		PDEBUG("Data read: %s", tmp);
-		j=0;
-                read_count += buffer->entry[i].size;
-            } else {
-                // we will run over the requested number of bytes, partial read
-                // TODO
-                // don't forget to break the loop
-            }
+        if(buffer->entry[i].size == 0 || (count - read_count) == 0) {
+            // there is no more data, break loop
+            break;
         }
+        if(read_count + buffer->entry[i].size < count) {
+            // if we have room for the entire entry
+	    PDEBUG("Going to read %zu from entry %i", buffer->entry[i].size, i);
+    	    end = buffer->entry[i].size;
+	} else {
+            PDEBUG("Going to partially read %zu from entry %i", count - read_count, i);
+	    end = count - read_count + *byte_offset;
+	}
+        PDEBUG("k %i, end %i", k, end);
+        for(k; k < end; k++) {
+	    tmp[j] = buffer->entry[i].buffptr[k];
+            data[read_count + j] = buffer->entry[i].buffptr[k];
+	    j++;
+        }
+
+	PDEBUG("Data read: %s", tmp);
+        read_count += j;
+	j=0;
+	k=0;
+    }
     return read_count;
 }
 
