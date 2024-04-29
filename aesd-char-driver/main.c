@@ -450,7 +450,9 @@ void aesd_cleanup_module(void)
      */
     AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device.buffer, index) {
 	PDEBUG("data: %s",entry->buffptr);
-	kfree(entry->buffptr);
+	if (index < aesd_device.buffer->in_offs) {
+	    kfree(entry->buffptr);
+	}
     }
     kfree(aesd_device.buffer);
     kfree(aesd_device.partial_entry);
