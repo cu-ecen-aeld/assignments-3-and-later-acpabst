@@ -23,6 +23,7 @@
 
 #include "aesdchar.h"
 #include "aesd-circular-buffer.h"
+#include "aesd_ioctl.h"
 
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
@@ -74,6 +75,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     PDEBUG("----READING----");
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
     
+    PDEBUG("fpos passed: %lli fpos file: %lli",*f_pos, filp->f_pos); 
 
     // lock data
     i = mutex_is_locked(aesd_device->mutex);
@@ -104,6 +106,12 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
     size_t *byte_offset = kmalloc(sizeof(size_t),GFP_KERNEL);
     struct aesd_buffer_entry *point_entry;
+
+    if(aesd_device->seek) {
+        *f_pos = aesd_device->seekto_position;
+	aesd_device->seek = false;
+    }
+
     if (*f_pos != 0) {
         point_entry = aesd_circular_buffer_find_entry_offset_for_fpos(aesd_device->buffer, *f_pos, byte_offset); 
 	// TODO if the entry is NULL
@@ -126,7 +134,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	*byte_offset = 0;
     }
 
-    PDEBUG("start entry index: %li, outoffs: %li", start_entry_index, aesd_device->buffer->out_offs);
+    PDEBUG("start entry index: %li, outoffs: %i", start_entry_index, aesd_device->buffer->out_offs);
 
     if (!aesd_device->buffer->full) {   
         read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
@@ -295,6 +303,54 @@ loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
     }
 }
 
+static long aesd_adjust_file_offset(struct file *filp, struct aesd_seekto *seekto) {
+    int i;
+    struct aesd_dev *aesd_device = filp->private_data;
+    loff_t new_pos = 0;
+    PDEBUG("Adjusting file offset");
+    
+    for (i = 0; i < seekto->write_cmd; i++) {
+	    new_pos += aesd_device->buffer->entry[i].size;
+    }
+    new_pos += seekto->write_cmd_offset;
+    PDEBUG("New position %lli", new_pos);
+    aesd_device->seekto_position = new_pos;
+    aesd_device->seek = true;
+
+    return 0;
+}
+
+static long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
+    long retval;
+    // check for invalid commands
+    PDEBUG("----IOCTL----");
+    if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
+    if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
+    //struct aesd_seekto *seekto = kmalloc(sizeof(struct aesd_seekto), GFP_KERNEL);
+    struct aesd_seekto seekto;
+    //unsigned long *from_user = kmalloc(sizeof(unsigned long));
+    switch(cmd) {
+        case AESDCHAR_IOCSEEKTO:
+	    PDEBUG("Seek invoked");
+	    retval = copy_from_user (&seekto,(struct aesd_seekto *) arg, sizeof(struct aesd_seekto));
+            if (retval) {
+                // copy data to user failed
+                PDEBUG("copy_from_user failed. Number of failed bytes: %li", retval);
+		return -EINVAL;
+	    }
+	    //PDEBUG("ioctl data: %i %i", seekto->write_cmd, seekto->write_cmd_offset);
+	    PDEBUG("ioctl data: %i %i", seekto.write_cmd, seekto.write_cmd_offset);
+	    //seekto = (struct aesd_seekto) from_user;
+	    retval = aesd_adjust_file_offset(filp, &seekto); 
+	    //kfree(seekto);
+	    return retval;
+	default:
+            /* redundant, as cmd was checked against MAXNR */
+	    return -ENOTTY;
+    }
+    return 0;
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
@@ -302,6 +358,7 @@ struct file_operations aesd_fops = {
     .open =     aesd_open,
     .release =  aesd_release,
     .llseek =   aesd_llseek,
+    .unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
@@ -353,6 +410,9 @@ int aesd_init_module(void)
     aesd_device.partial_entry = aesd_partial_entry;
     aesd_device.partial_entry->size = 0;
     aesd_device.partial = false;
+    aesd_device.seekto_position = 0;
+    aesd_device.seek = false;
+
     aesd_device.buffer->full = false;
     aesd_device.buffer->in_offs = 0;
     aesd_device.buffer->out_offs = 0;

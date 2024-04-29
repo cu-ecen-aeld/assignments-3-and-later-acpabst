@@ -19,13 +19,15 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/time.h>
-
+#include <sys/ioctl.h>
 #include "queue.h"
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define USE_AESD_CHAR_DEVICE 1
 
 #define PORT "9000"
 #define BUF_SIZE (1024*30)
+#define AESD_IOC_MAGIC 0x16
 
 #ifdef USE_AESD_CHAR_DEVICE
 #    define OUTPUT_FILE "/dev/aesdchar"
@@ -54,3 +56,5 @@ void set_signal_handling();
 int open_socket();
 int recieve_socket_data(int sockfd);
 int return_socket_data(int sockfd);
+
+int ioctl(int fd, unsigned long request, ...);

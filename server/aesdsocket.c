@@ -236,13 +236,46 @@ int recieve_socket_data(int sockfd) {
 	    return -1;
         }
 
-	nwrit = write(output_file, buf, nrecv);
-        if (nwrit < 0) {
-	    close(output_file);
-	    printf("Are we erroring here?\n");
-            return -1;
-        }
-	ptr_null = strchr(buf, '\n');
+        // check for AESDCHAR_IOSEEKTO
+	char *tmp_buf = malloc(sizeof(buf));
+	memcpy(tmp_buf, buf, sizeof(buf));
+	char *ptr = strtok(tmp_buf, ":");
+	printf("data found: %s\n", ptr);
+	if(strcmp(ptr, "AESDCHAR_IOCSEEKTO") == 0) {
+            // seekto command identified
+	    printf("AESD Seek command identified\n");
+	    //int fd = fileno(output_file);
+
+	    // pull seek data from command
+	    ptr = strtok(NULL, ",");
+	    int entry = atoi(ptr);
+	    ptr = strtok(NULL, ",");
+	    int offset = atoi(ptr);
+	    printf("entry: %i, offset: %i\n", entry, offset);
+            struct aesd_seekto aesd_ioctl_struct;
+	    aesd_ioctl_struct.write_cmd = entry;
+	    aesd_ioctl_struct.write_cmd_offset = offset;
+	    
+	    if (ioctl(output_file, AESDCHAR_IOCSEEKTO, 
+	            (struct aesd_seekto*) &aesd_ioctl_struct)) {
+		printf("Error invoking ioctl for %s\n", OUTPUT_FILE);
+		close(output_file);
+		return -1;
+	    } else {
+		return 0;
+	    }
+
+	} else {
+	    // normal file write
+	    printf( "Normal write\n");
+	    nwrit = write(output_file, buf, nrecv);
+            if (nwrit < 0) {
+	        close(output_file);
+	        printf("Are we erroring here?\n");
+                return -1;
+            }
+	    ptr_null = strchr(buf, '\n');
+	}
     } while (ptr_null == NULL);
 
     close(output_file);

@@ -42,8 +42,14 @@ struct aesd_dev
     /* Partial buffer written bool */
     bool partial;
 
+    /* Seek information */
+    loff_t seekto_position;
+
+    /* Seek bool */
+    bool seek;
+
     /* Char device structure */
-    struct cdev cdev;     
+    struct cdev cdev;    
 };
 
 
