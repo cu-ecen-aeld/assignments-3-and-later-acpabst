@@ -60,10 +60,6 @@ int aesd_release(struct inode *inode, struct file *filp)
 ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
 {
-    if(TMP_FLAG) {
-        *f_pos = 60;
-	TMP_FLAG = false;
-    }
     ssize_t retval = 0;
     size_t read_count = 0;
     uint i;
@@ -138,7 +134,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
     if (!aesd_device->buffer->full) {   
         read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
-			start_entry_index, AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, 
+			start_entry_index, aesd_device->buffer->in_offs, 
 			tmp_buf, count, byte_offset);
     } else {
         if (aesd_device->buffer->out_offs <= start_entry_index) {
