@@ -38,9 +38,10 @@ struct aesd_seekto {
 
 // Define a write command from the user point of view, use command number 1
 #define AESDCHAR_IOCSEEKTO _IOWR(AESD_IOC_MAGIC, 1, struct aesd_seekto)
+#define AESDCHAR_FLUSH _IO(AESD_IOC_MAGIC, 2)
 /**
  * The maximum number of commands supported, used for bounds checking
  */
-#define AESDCHAR_IOC_MAXNR 1
+#define AESDCHAR_IOC_MAXNR 2
 
 #endif /* AESD_IOCTL_H */

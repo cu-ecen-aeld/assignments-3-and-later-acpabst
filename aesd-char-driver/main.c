@@ -316,6 +316,28 @@ static long aesd_adjust_file_offset(struct file *filp, struct aesd_seekto *seekt
     return 0;
 }
 
+static long aesd_flush(struct file *filp) {
+    int index = 0;
+    struct aesd_buffer_entry *entry;
+    struct aesd_dev *aesd_device = filp->private_data;
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, aesd_device->buffer, index) {
+        if (index < aesd_device->buffer->in_offs) {
+            PDEBUG("data: %s",entry->buffptr);
+            kfree(entry->buffptr);
+        }
+    }
+    aesd_device->partial_entry->size = 0;
+    aesd_device->partial = false;
+    aesd_device->seekto_position = 0;
+    aesd_device->seek = false;
+
+    aesd_device->buffer->full = false;
+    aesd_device->buffer->in_offs = 0;
+    aesd_device->buffer->out_offs = 0;
+    aesd_device->buffer->total_size = 0;
+    return 0;
+}
+
 static long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
     long retval;
     // check for invalid commands
@@ -334,11 +356,12 @@ static long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
                 PDEBUG("copy_from_user failed. Number of failed bytes: %li", retval);
 		return -EINVAL;
 	    }
-	    //PDEBUG("ioctl data: %i %i", seekto->write_cmd, seekto->write_cmd_offset);
 	    PDEBUG("ioctl data: %i %i", seekto.write_cmd, seekto.write_cmd_offset);
-	    //seekto = (struct aesd_seekto) from_user;
 	    retval = aesd_adjust_file_offset(filp, &seekto); 
-	    //kfree(seekto);
+	    return retval;
+	case AESDCHAR_FLUSH:
+	    PDEBUG("Flush invoked");
+	    retval = aesd_flush(filp);
 	    return retval;
 	default:
             /* redundant, as cmd was checked against MAXNR */
