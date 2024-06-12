@@ -11,6 +11,18 @@ endif
 
 EXTRA_CFLAGS += $(DEBFLAGS)
 
+CC ?= gcc
+CFLAGS ?= -g -pthread
+LDFLAGS ?= -lm
+
+ifeq ($(CROSS_COMPILE),)
+ $(info Compiling natively.)
+else
+ CROSS_COMPILE_FULL = aarch64-none-linux-gnu-$(CROSS_COMPILE)
+ CC = $(CROSS_COMPILE_FULL)
+ $(info Cross compiling: $(CROSS_COMPILE_FULL))
+endif
+
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
 obj-m	:= aesdchar.o
@@ -20,8 +32,14 @@ else
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 PWD       := $(shell pwd)
 
+all: modules test
+
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+
+test:
+	$(CC) $(CFLAGS) -c flush_test.c -o flush_test.o
+	$(CC) $(CFLAGS) flush_test.o -o flush_test
 
 endif
 
