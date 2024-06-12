@@ -20,7 +20,7 @@ int main (int argc, char*argv[]) {
     int res = ioctl(output_file, AESDCHAR_FLUSH);
     if (res) {    
         printf("Error invoking ioctl for %s\n", OUTPUT_FILE);
-	printf("Result: %i, Errno: %d\n", res, errno):
+	printf("Result: %i, Errno: %d\n", res, errno);
         close(output_file);
         return -1;
     }
