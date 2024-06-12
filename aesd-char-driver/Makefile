@@ -30,8 +30,8 @@ modules:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 test:
-	$(CC) $(CFLAGS) -c flush_test.c -o flush_test.o
-	$(CC) $(CFLAGS) flush_test.o -o flush_test
+	$(CC) $(CFLAGS) -c flush_test.c -o flush_test.o ${LDFLAGS}
+	$(CC) $(CFLAGS) flush_test.o -o flush_test ${LDFLAGS}
 
 endif
 
