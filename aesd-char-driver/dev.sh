@@ -14,19 +14,22 @@ read_with_seek()
         dd if=${device} skip=${seek} of=${read_file} bs=1 > /dev/null 2>&1
 }
 
-echo "write1" > ${device}
-echo "write2" > ${device}
-echo "write3" > ${device}
-echo "write4" > ${device}
+echo "write1" >> ${device}
+echo "write2" >> ${device}
+echo "write3" >> ${device}
+echo "write4" >> ${device}
 echo "write5" > ${device}
 echo "write6" > ${device}
 echo "write7" > ${device}
 echo "write8" > ${device}
 echo "write9" > ${device}
 echo "write10" > ${device}
+echo "write11" > ${device}
 
-read_with_seek 2 ${device} ${read_file}
-cat ${read_file}
+cat ${device}
+
+#read_with_seek 2 ${device} ${read_file}
+#cat ${read_file}
 #rm ${read_file}
 
 #./../server/aesdsocket

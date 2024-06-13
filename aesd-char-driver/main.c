@@ -142,9 +142,9 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	    read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
                         start_entry_index, AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED, 
                         tmp_buf, count, byte_offset);
-	    read_count += aesd_circular_buffer_read_helper(aesd_device->buffer,
+	    /*read_count += aesd_circular_buffer_read_helper(aesd_device->buffer,
                         0, aesd_device->buffer->out_offs,
-                        tmp_buf, count, byte_offset);
+                        tmp_buf, count, byte_offset); */
 	} else {
 	    // seeked position is on the front of the buffer
 	    read_count += aesd_circular_buffer_read_helper(aesd_device->buffer, 
@@ -165,7 +165,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     }
     // unlock data
   //  mutex_unlock(aesd_device->mutex);
-
+    PDEBUG("Data to copy: %s", tmp_buf);
     retval = copy_to_user(buf, tmp_buf, count);
     if (retval) {
 	    // copy data to user failed
