@@ -3,8 +3,8 @@
 device=/dev/aesdchar
 
 # load and unload aesdchar driver
-/usr/bin/aesdchar_unload
-/usr/bin/aesdchar_load
+sudo ./../aesd-char-driver/aesdchar_unload
+sudo ./../aesd-char-driver/aesdchar_load
 
 # write data to the circular buffer
 echo "write1" >> ${device}
