@@ -152,7 +152,7 @@ extern size_t aesd_circular_buffer_read_helper(struct aesd_circular_buffer *buff
     char* tmp = kmalloc(count, GFP_KERNEL);
     PDEBUG(" %li %li %li %li %li,", index1, index2, count, read_count, *byte_offset);
     for(i = index1; i < index2; i++) {
-	PDEBUG("entry %i size: %zu", i, buffer->entry[i].size);
+	//PDEBUG("entry %i size: %zu", i, buffer->entry[i].size);
         if(buffer->entry[i].size == 0 || (count - read_count) == 0) {
             // there is no more data, break loop
             break;
@@ -173,7 +173,9 @@ extern size_t aesd_circular_buffer_read_helper(struct aesd_circular_buffer *buff
         }
 
 	PDEBUG("Data read: %s", tmp);
+	PDEBUG("Total data read: %s, size: %li", data, sizeof(data));
         read_count += j;
+	PDEBUG("read_count = %i", read_count);
 	j=0;
 	k=0;
     }
